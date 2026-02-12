@@ -7,7 +7,7 @@ import json
 # ==========================================
 # 1. 請在此處重新貼上您的 Google Apps Script 網址
 # ==========================================
-SCRIPT_URL = "這裡貼上您的網址"
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 
 st.set_page_config(page_title="雲端點名系統", page_icon="🍎")
 
@@ -98,3 +98,4 @@ if st.button("🚀 確認提交並同步至雲端 Excel", type="primary", use_co
             st.balloons()
         else:
             st.error(f"⚠️ 部分失敗 (成功: {success_count}/{len(status_dict)})，請檢查網路。")
+
