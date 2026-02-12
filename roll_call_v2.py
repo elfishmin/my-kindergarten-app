@@ -11,7 +11,7 @@ import time
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 st.set_page_config(page_title="才藝班點名系統", page_icon="🏫", layout="wide")
 
-# 完整 240+ 筆交叉比對名單 (根據您上傳的 Excel 檔案整理)
+# 完整 240+ 筆交叉比對名單 (名單內容不變，僅調整介面)
 all_data = {
     "星期一": {
         "舞蹈A": [("冰淇淋", "吳姷樼"), ("冰淇淋", "宋宥希"), ("冰淇淋", "張簡睿泱"), ("彩虹魚", "周子芹"), ("雪碧", "陳禹妃"), ("雪碧", "劉苡璇"), ("雪碧", "龔畇溱"), ("綠格子", "邱子芮")],
@@ -43,22 +43,18 @@ today_str = today_dt.strftime("%Y-%m-%d")
 weekday_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 current_day = weekday_map.get(today_dt.weekday(), "星期一")
 
-if 'done_list' not in st.session_state:
-    st.session_state.done_list = []
+if 'done_list' not in st.session_state: st.session_state.done_list = []
 if 'current_class' not in st.session_state:
-    if current_day in all_data:
-        st.session_state.current_class = list(all_data[current_day].keys())[0]
-    else:
-        st.session_state.current_class = "足球"
+    st.session_state.current_class = list(all_data.get(current_day, {"足球":[]}).keys())[0]
 
 # --- 3. 側邊欄 ---
 with st.sidebar:
     st.title("🏫 才藝點名")
-    if st.button("🔄 刷新雲端狀態", use_container_width=True):
+    if st.button("🔄 刷新雲端勾勾", use_container_width=True):
         try:
             r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
             st.session_state.done_list = r.json() if r.status_code == 200 else []
-            st.toast("已同步勾勾")
+            st.toast("同步成功！")
         except: st.toast("連線雲端中...")
     
     st.divider()
@@ -78,9 +74,7 @@ for d in all_data:
         break
 
 st.title(f"🍎 {active_class}")
-st.write(f"📊 名冊共 {len(students)} 位學生")
 
-# 快速功能按鈕
 c_a, c_b = st.columns(2)
 with c_a:
     if st.button("🙋‍♂️ 全員到校", use_container_width=True):
@@ -91,24 +85,24 @@ with c_b:
 
 st.divider()
 
-# 點名區：人名左對齊，縮短與選項距離
+# 點名區：極限縮短名字與選項的距離
 status_results = {}
 for class_name, name in students:
     full_id = f"{class_name}_{name}"
-    # 使用 [4.5, 4.5, 1] 比例，讓第一欄和第二欄更緊湊
-    col1, col2, col3 = st.columns([4.5, 4.5, 1])
+    
+    # 比例微調為 [3, 6, 1]，並移除欄位間隙
+    col1, col2, col3 = st.columns([3, 6, 1])
     
     with col1: 
-        # 固定班級寬度為 70px，使人名起頭完全對齊
+        # 使用負 margin-right 讓 col1 的內容更靠近 col2
         st.markdown(f"""
-            <div style='display: flex; align-items: center;'>
-                <div style='width: 70px; color: gray; font-size: 13px; flex-shrink: 0;'>{class_name}</div>
-                <div style='font-size: 24px; font-weight: bold; margin-left: 5px; color: #1E1E1E;'>{name}</div>
+            <div style='display: flex; align-items: center; margin-right: -100px;'>
+                <div style='width: 60px; color: gray; font-size: 12px; flex-shrink: 0;'>{class_name}</div>
+                <div style='font-size: 24px; font-weight: bold; margin-left: 5px; color: #1E1E1E; white-space: nowrap;'>{name}</div>
             </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        # 選項緊貼在名字右側
         res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
         status_results[full_id] = (class_name, name, res)
     
@@ -136,4 +130,4 @@ with col_save:
 with col_dl:
     df_export = pd.DataFrame([{"班級": i[0], "姓名": i[1], "狀態": i[2], "備註": i[3]} for i in status_results.values()])
     csv_data = df_export.to_csv(index=False).encode('utf-8-sig') 
-    st.download_button(label="📥 CSV 下載", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
+    st.download_button(label="📥 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
