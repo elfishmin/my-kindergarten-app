@@ -50,4 +50,73 @@ if 'current_class' not in st.session_state:
     else:
         st.session_state.current_class = "足球"
 
-# --- 3. 側邊欄
+# --- 3. 側邊欄 ---
+with st.sidebar:
+    st.title("🏫 全校才藝點名")
+    if st.button("🔄 刷新雲端狀態", use_container_width=True):
+        try:
+            r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
+            st.session_state.done_list = r.json() if r.status_code == 200 else []
+            st.toast("同步成功！")
+        except: st.toast("連線雲端中...")
+    
+    st.divider()
+    for day, classes in all_data.items():
+        st.markdown(f"### {'🟢' if day == current_day else '⚪'} {day}")
+        for c in classes.keys():
+            icon = "✅" if c in st.session_state.done_list else "📝"
+            if st.button(f"{icon} {c}", key=f"btn_{day}_{c}", use_container_width=True):
+                st.session_state.current_class = c
+
+# --- 4. 主畫面 ---
+active_class = st.session_state.current_class
+students = []
+for d in all_data:
+    if active_class in all_data[d]:
+        students = all_data[d][active_class]
+        break
+
+st.title(f"🍎 當前課程：{active_class}")
+st.write(f"📊 本班共有 {len(students)} 位學生")
+
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("🙋‍♂️ 全員到校", use_container_width=True):
+        for cn, sn in students: st.session_state[f"s_{cn}_{sn}"] = "到校"
+with c2:
+    if st.button("🧹 重置名單", use_container_width=True):
+        for cn, sn in students: st.session_state[f"s_{cn}_{sn}"] = "到校"
+
+st.divider()
+
+status_results = {}
+for class_name, name in students:
+    full_id = f"{class_name}_{name}"
+    col1, col2, col3 = st.columns([2, 3, 2])
+    with col1: st.write(f"**{class_name}**\n\n{name}")
+    with col2:
+        res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
+        status_results[full_id] = (class_name, name, res)
+    with col3:
+        note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+        status_results[full_id] += (note,)
+
+# --- 5. 儲存與下載 ---
+st.divider()
+col_save, col_dl = st.columns([2, 1])
+
+with col_save:
+    if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
+        if active_class not in st.session_state.done_list: st.session_state.done_list.append(active_class)
+        payload = [{"date": today_str, "classroom": active_class, "lesson": item[0], "name": item[1], "status": item[2], "time": datetime.now().strftime("%H:%M:%S"), "note": item[3]} for item in status_results.values()]
+        try: requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=0.1)
+        except: pass
+        st.toast("🎉 雲端儲存成功！")
+        time.sleep(0.5)
+        st.rerun()
+
+with col_dl:
+    # 針對老版 Excel 亂碼優化：使用 utf-8-sig
+    df_export = pd.DataFrame([{"班級": i[0], "姓名": i[1], "狀態": i[2], "備註": i[3]} for i in status_results.values()])
+    csv_data = df_export.to_csv(index=False).encode('utf-8-sig') 
+    st.download_button(label="📥 下載本班 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
