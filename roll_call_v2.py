@@ -31,14 +31,23 @@ st.title(f"🍎 {classroom} 點名系統")
 if 'default_status' not in st.session_state:
     st.session_state.default_status = "到校"
 
+# --- 4. 增加「一鍵全選」按鈕區 ---
+# 使用 session_state 來儲存目前的預設狀態
+if 'default_status' not in st.session_state:
+    st.session_state.default_status = "到校"
+
 st.write("#### 快速操作")
 col_btn1, col_btn2 = st.columns(2)
+
 with col_btn1:
     if st.button("✅ 全班到齊", use_container_width=True):
         st.session_state.default_status = "到校"
+        st.rerun()  # <--- 關鍵：點擊後立刻重新整理網頁，下面的選項才會同步更新
+
 with col_btn2:
     if st.button("❌ 全班未到", use_container_width=True):
         st.session_state.default_status = "未到"
+        st.rerun()  # <--- 關鍵：點擊後立刻重新整理網頁
 
 st.divider()
 
@@ -98,4 +107,5 @@ if st.button("🚀 確認提交並同步至雲端 Excel", type="primary", use_co
             st.balloons()
         else:
             st.error(f"⚠️ 部分失敗 (成功: {success_count}/{len(status_dict)})，請檢查網路。")
+
 
