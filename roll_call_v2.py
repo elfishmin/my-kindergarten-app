@@ -5,11 +5,11 @@ import requests
 import json
 
 # ==========================================
-# 1. 請在此處貼上您的 Google Apps Script 網址
+# 1. 請在此處重新貼上您的 Google Apps Script 網址
 # ==========================================
 SCRIPT_URL = "這裡貼上您的網址"
 
-st.set_page_config(page_title="雲端點名系統", page_icon="🍎", layout="centered")
+st.set_page_config(page_title="雲端點名系統", page_icon="🍎")
 
 # 2. 學生名單資料庫
 students_data = {
@@ -25,33 +25,28 @@ lesson_name = st.sidebar.text_input("課堂名稱", value="早自習")
 today = datetime.now().strftime("%Y-%m-%d")
 
 st.title(f"🍎 {classroom} 點名系統")
-st.write(f"日期：{today} | 課堂：{lesson_name}")
 
-# --- 4. 增加「一鍵全選」功能 ---
-st.subheader("快速操作")
-col_all1, col_all2 = st.columns(2)
+# --- 4. 增加「一鍵全選」按鈕區 ---
+# 使用 session_state 來儲存目前的預設狀態
+if 'default_status' not in st.session_state:
+    st.session_state.default_status = "到校"
 
-# 初始化 Session State (用來控制按鈕狀態)
-if 'all_status' not in st.session_state:
-    st.session_state.all_status = "到校"
-
-with col_all1:
+st.write("#### 快速操作")
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
     if st.button("✅ 全班到齊", use_container_width=True):
-        st.session_state.all_status = "到校"
-        st.rerun() # 重新整理頁面以更新狀態
-
-with col_all2:
+        st.session_state.default_status = "到校"
+with col_btn2:
     if st.button("❌ 全班未到", use_container_width=True):
-        st.session_state.all_status = "未到"
-        st.rerun()
+        st.session_state.default_status = "未到"
 
 st.divider()
 
 # 5. 點名介面
+st.write(f"今日日期：{today} | 課堂：{lesson_name}")
 status_dict = {}
-st.write("#### 學生名單回報")
 
-# 根據選擇的班級顯示名單
+# 取得目前班級名單
 current_students = students_data[classroom]
 
 for student in current_students:
@@ -59,24 +54,26 @@ for student in current_students:
     with col1:
         st.write(f"**{student}**")
     with col2:
-        # 這裡的 index 會根據快速操作按鈕改變
-        default_idx = ["到校", "請假", "未到"].index(st.session_state.all_status)
+        # 根據快速操作按鈕的選擇，動態設定 index
+        options = ["到校", "請假", "未到"]
+        idx = options.index(st.session_state.default_status)
         
+        # 使用 classroom + student 作為 key，確保換班級時狀態會重新連動
         status = st.radio(
             f"狀態-{student}", 
-            options=["到校", "請假", "未到"], 
-            index=default_idx,
+            options=options, 
+            index=idx,
             horizontal=True, 
-            key=f"{classroom}_{student}", # 增加班級前綴，避免切換班級時報錯
+            key=f"{classroom}_{student}",
             label_visibility="collapsed"
         )
         status_dict[student] = status
 
 st.divider()
 
-# 6. 提交至雲端
-if st.button("🚀 確認提交並上傳雲端", type="primary", use_container_width=True):
-    with st.spinner('連線中，請稍候...'):
+# 6. 提交按鈕
+if st.button("🚀 確認提交並同步至雲端 Excel", type="primary", use_container_width=True):
+    with st.spinner('同步中，請稍候...'):
         success_count = 0
         now_time = datetime.now().strftime("%H:%M:%S")
         
@@ -97,7 +94,7 @@ if st.button("🚀 確認提交並上傳雲端", type="primary", use_container_w
                 pass
 
         if success_count == len(status_dict):
-            st.success(f"🎉 {classroom} 共 {success_count} 筆紀錄已存入雲端 Excel！")
+            st.success(f"🎉 成功！{classroom} 共 {success_count} 位同學紀錄已寫入雲端。")
             st.balloons()
         else:
-            st.error("⚠️ 部分資料上傳失敗，請檢查網路或網址設定。")
+            st.error(f"⚠️ 部分失敗 (成功: {success_count}/{len(status_dict)})，請檢查網路。")
