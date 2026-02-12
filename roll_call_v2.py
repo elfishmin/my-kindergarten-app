@@ -18,10 +18,6 @@ students_data = {
     "小班": ["郭雪芙", "蔡依林", "張惠妹", "陳奕迅"]
 }
 
-# 3. 初始化 Session State (確保快速操作按鈕運作正常)
-if 'default_status' not in st.session_state:
-    st.session_state.default_status = "到校"
-
 # 側邊欄設定
 st.sidebar.header("⚙️ 管理選單")
 classroom = st.sidebar.selectbox("選擇班級", list(students_data.keys()))
@@ -30,28 +26,17 @@ today = datetime.now().strftime("%Y-%m-%d")
 
 st.title(f"🍎 {classroom} 點名系統")
 
-# --- 4. 快速操作區域 ---
-st.write("#### 快速操作")
-col_btn1, col_btn2 = st.columns(2)
-with col_btn1:
-    if st.button("✅ 全班到齊", use_container_width=True):
-        st.session_state.default_status = "到校"
-        st.rerun() 
-with col_btn2:
-    if st.button("❌ 全班未到", use_container_width=True):
-        st.session_state.default_status = "未到"
-        st.rerun()
+# 已移除快速操作按鈕 (全班到齊/全班未到)
+st.write("請勾選下方學生出勤狀況：")
 
 st.divider()
 
-# --- 5. 點名清單介面 ---
+# --- 3. 點名清單介面 ---
 status_dict = {}
 reason_dict = {}
 current_students = students_data[classroom]
 
 options = ["到校", "請假", "未到"]
-# 根據 default_status 決定 radio 的起始位置
-current_idx = options.index(st.session_state.default_status)
 
 for student in current_students:
     col1, col2, col3 = st.columns([1, 3, 2])
@@ -60,10 +45,10 @@ for student in current_students:
         st.write(f"**{student}**")
         
     with col2:
-        # 使用 key 確保狀態獨立，使用 index 連動快速按鈕
+        # 移除 index 連動，預設皆為 "到校" (options 的第 0 個)
         status = st.radio(
             f"S-{student}", options, 
-            index=current_idx, 
+            index=0, 
             horizontal=True, 
             key=f"s_{classroom}_{student}", 
             label_visibility="collapsed"
@@ -85,12 +70,11 @@ for student in current_students:
 
 st.divider()
 
-# --- 6. 提交邏輯 (優化後的批次傳送) ---
+# --- 4. 提交邏輯 (批次傳送) ---
 if st.button("🚀 確認提交", type="primary", use_container_width=True):
     with st.spinner('正在同步全班資料至 Google 試算表...'):
         now_time = datetime.now().strftime("%H:%M:%S")
         
-        # 建立整班的資料包
         payload_list = []
         for name, stat in status_dict.items():
             payload_list.append({
@@ -104,7 +88,6 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
             })
         
         try:
-            # 一次性發送整包 JSON 列表
             response = requests.post(SCRIPT_URL, data=json.dumps(payload_list))
             if response.status_code == 200:
                 st.success(f"🎉 {classroom} 點名紀錄已成功儲存！")
@@ -113,4 +96,3 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
                 st.error(f"連線失敗，請檢查 Script 部署權限。 (錯誤碼: {response.status_code})")
         except Exception as e:
             st.error(f"發生非預期錯誤: {e}")
-
