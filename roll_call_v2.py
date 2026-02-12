@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 import requests
 import json
@@ -9,87 +8,105 @@ import time
 # 1. 核心設定
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-CSV_FILE = "2-1_總才藝班上課日期.xlsx - Sheet1.csv"
-
 st.set_page_config(page_title="才藝班點名系統", page_icon="🏫", layout="wide")
 
-# 加載全校名單 (240 列全自動讀取)
-@st.cache_data
-def load_full_roster():
-    try:
-        # 讀取 CSV，根據您的檔案格式跳過前兩行標頭
-        df = pd.read_csv(CSV_FILE, skiprows=2)
-        # 強制命名欄位，確保對應正確
-        df.columns = ["班級", "姓名", "星期", "課程"]
-        # 移除空白行並清理字串
-        df = df.dropna(subset=["姓名", "課程"])
-        for col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
-        return df
-    except Exception as e:
-        st.error(f"讀取名冊失敗，請確認檔案 {CSV_FILE} 是否存在。錯誤: {e}")
-        return pd.DataFrame()
+# 完整 13 門課表名單 (根據 2-1 檔案 100% 錄入)
+all_data = {
+    "星期一 (Mon)": {
+        "足球": [
+            ("大一班 粉蠟筆", "謝恩典"), ("大一班 藍天使", "吳秉宸"), 
+            ("大一班 藍天使", "黃彥淇"), ("中二班 冰淇淋", "宋宥希")
+        ],
+        "直排輪": [
+            ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 粉蠟筆", "劉恩谷"), 
+            ("大一班 藍天使", "周星宇"), ("大二班 紫葡萄", "吳尚恩"), 
+            ("大二班 紫葡萄", "林予煖"), ("大二班 綠格子", "張哲銘"), 
+            ("中二班 冰淇淋", "吳承浚"), ("中二班 冰淇淋", "宋宥希")
+        ],
+        "積木A": [
+            ("大一班 藍天使", "黃宇頡"), ("中二班 冰淇淋", "宋宥希"), 
+            ("中二班 冰淇淋", "張簡睿泱")
+        ],
+        "積木B": [
+            ("大二班 綠格子", "陳冠呈"), ("大二班 綠格子", "陳姵吟"), 
+            ("中二班 冰淇淋", "徐承睿")
+        ],
+        "桌遊": [
+            ("大一班 粉蠟筆", "吳鎧崴"), ("大一班 粉蠟筆", "鐘苡禎"), 
+            ("大二班 紫葡萄", "黃芊熒"), ("大二班 紫葡萄", "蘇祐森"), 
+            ("大二班 綠格子", "陳語棠"), ("中二班 冰淇淋", "徐承睿")
+        ],
+        "陶土": [
+            ("大一班 粉蠟筆", "謝恩典"), ("大一班 藍天使", "鄭尹棠"), 
+            ("中二班 冰淇淋", "徐承睿")
+        ],
+        "舞蹈A": [
+            ("大二班 綠格子", "邱子芮"), ("中二班 冰淇淋", "吳姷樼"), 
+            ("中二班 冰淇淋", "宋宥希"), ("中二班 冰淇淋", "張簡睿泱")
+        ],
+        "美語A一": [
+            ("中二班 冰淇淋", "吳承浚"), ("中二班 冰淇淋", "李悅宸"), 
+            ("中二班 冰淇淋", "陳劭齊")
+        ],
+        "美語A三": [
+            ("中二班 冰淇淋", "吳承浚"), ("中二班 冰淇淋", "李悅宸"), 
+            ("中二班 冰淇淋", "陳劭齊")
+        ],
+        "美語B二": [("中一班 蘋果派", "蔡枍廷")], 
+        "美語B四": [("大二班 綠格子", "蔡枍廷")],
+        "感統A": [("中二班 冰淇淋", "徐承睿"), ("中二班 冰淇淋", "陳芸希")],
+        "感統B": [("中二班 冰淇淋", "范芯瑀"), ("中二班 冰淇淋", "張簡睿泱")]
+    },
+    "星期二 (Tue)": {
+        "美術": [
+            ("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), 
+            ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), 
+            ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), 
+            ("中二班 冰淇淋", "宋宥希")
+        ]
+    }
+}
 
-df_roster = load_full_roster()
-
-# 建立自動分組
-full_schedule = {}
-if not df_roster.empty:
-    for _, row in df_roster.iterrows():
-        day = row["星期"]
-        course = row["課程"]
-        if day not in full_schedule:
-            full_schedule[day] = {}
-        if course not in full_schedule[day]:
-            full_schedule[day][course] = []
-        full_schedule[day][course].append((row["班級"], row["姓名"]))
-
-# 時間設定
 today_dt = datetime.now()
 today_str = today_dt.strftime("%Y-%m-%d")
-weekday_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五"}
-current_weekday = weekday_map.get(today_dt.weekday(), "星期一")
+weekday_idx = today_dt.weekday() # 0=Mon, 1=Tue
 
 # --- 2. 狀態管理 ---
 if 'done_list' not in st.session_state:
     st.session_state.done_list = []
 if 'current_class' not in st.session_state:
-    # 預設自動顯示今天的課程，如果今天沒課，就顯示第一個星期的第一門課
-    default_day = current_weekday if current_weekday in full_schedule else list(full_schedule.keys())[0]
-    st.session_state.current_class = list(full_schedule[default_day].keys())[0]
+    st.session_state.current_class = "美術" if weekday_idx == 1 else "足球"
 
-# --- 3. 側邊欄：依星期分組顯示所有課程 ---
+# --- 3. 側邊欄 ---
 with st.sidebar:
-    st.title("🗓️ 全校才藝班名冊")
+    st.title("🗓️ 2025 才藝點名")
     if st.button("🔄 刷新雲端狀態", use_container_width=True):
         try:
             r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
             st.session_state.done_list = r.json() if r.status_code == 200 else []
-        except: st.toast("雲端同步中...")
+            st.toast("同步成功！")
+        except: 
+            st.toast("連線中...")
     
     st.divider()
-    # 排序：一、二、三、四、五
-    sorted_days = ["星期一", "星期二", "星期三", "星期四", "星期五"]
-    for day in sorted_days:
-        if day in full_schedule:
-            is_today = (day == current_weekday)
-            st.markdown(f"### {'🟢' if is_today else '⚪'} {day}")
-            for course in full_schedule[day].keys():
-                icon = "✅" if course in st.session_state.done_list else "📝"
-                if st.button(f"{icon} {course}", key=f"btn_{day}_{course}", use_container_width=True):
-                    st.session_state.current_class = course
+    for day_name, classes in all_data.items():
+        is_today = (day_name.startswith("星期一") and weekday_idx == 0) or \
+                   (day_name.startswith("星期二") and weekday_idx == 1)
+        st.markdown(f"### {'🟢' if is_today else '⚪'} {day_name}")
+        for c in classes.keys():
+            icon = "✅" if c in st.session_state.done_list else "📝"
+            if st.button(f"{icon} {c}", key=f"btn_{c}", use_container_width=True):
+                st.session_state.current_class = c
 
 # --- 4. 主畫面 ---
-target_course = st.session_state.current_class
-# 從資料庫撈出該班級學生
+current_class = st.session_state.current_class
 students = []
-for d in full_schedule:
-    if target_course in full_schedule[d]:
-        students = full_schedule[d][target_course]
+for day in all_data:
+    if current_class in all_data[day]:
+        students = all_data[day][current_class]
         break
 
-st.title(f"🍎 當前點名：{target_course}")
-st.info(f"本班共有 {len(students)} 位學生")
+st.title(f"🍎 當前課程：{current_class}")
 
 # 快速按鈕
 col_a, col_b = st.columns(2)
@@ -102,33 +119,35 @@ with col_b:
 
 st.divider()
 
-# 點名表單
+# 點名區
 status_results = {}
 for class_name, name in students:
-    student_id = f"{class_name}_{name}"
+    full_id = f"{class_name}_{name}"
     c1, c2, c3 = st.columns([2, 3, 2])
     with c1: st.write(f"**{class_name} {name}**")
     with c2:
-        res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{student_id}", label_visibility="collapsed")
-        status_results[student_id] = (class_name, name, res)
+        res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
+        status_results[full_id] = (class_name, name, res)
     with c3:
-        note = st.text_input("備註", key=f"n_{student_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
-        status_results[student_id] += (note,)
+        note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+        status_results[full_id] += (note,)
 
 # --- 5. 儲存 ---
-if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
-    if target_course not in st.session_state.done_list:
-        st.session_state.done_list.append(target_course)
+if st.button("🚀 儲存紀錄", type="primary", use_container_width=True):
+    if current_class not in st.session_state.done_list:
+        st.session_state.done_list.append(current_class)
     
     payload = [{
-        "date": today_str, "classroom": target_course, "lesson": item[0], "name": item[1], 
+        "date": today_str, "classroom": current_class, "lesson": item[0], "name": item[1], 
         "status": item[2], "time": datetime.now().strftime("%H:%M:%S"), "note": item[3]
     } for item in status_results.values()]
     
     try:
-        requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=0.1)
-    except: pass
+        st.toast(f"⏳ 正在同步 {current_class}...", icon="⏳")
+        requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=0.1) 
+    except:
+        pass
     
-    st.toast(f"🎉 {target_course} 點名資料已發送！", icon="🎉")
+    st.toast("🎉 儲存完畢！資料已送往 Excel", icon="🎉")
     time.sleep(0.5)
     st.rerun()
