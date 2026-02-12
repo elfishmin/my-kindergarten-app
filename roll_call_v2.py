@@ -18,7 +18,10 @@ students_data = {
     "小班": ["郭雪芙", "蔡依林", "張惠妹", "陳奕迅"]
 }
 
-# 3. 側邊欄
+# 3. 側邊欄與初始化
+if 'default_status' not in st.session_state:
+    st.session_state.default_status = "到校"
+
 st.sidebar.header("⚙️ 管理選單")
 classroom = st.sidebar.selectbox("選擇班級", list(students_data.keys()))
 lesson_name = st.sidebar.text_input("課堂名稱", value="早自習")
@@ -27,9 +30,6 @@ today = datetime.now().strftime("%Y-%m-%d")
 st.title(f"🍎 {classroom} 點名系統")
 
 # --- 4. 快速操作 (連動邏輯核心) ---
-if 'default_status' not in st.session_state:
-    st.session_state.default_status = "到校"
-
 st.write("#### 快速操作")
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
@@ -48,25 +48,30 @@ status_dict = {}
 reason_dict = {}
 current_students = students_data[classroom]
 
+# 定義選項與對應的數字索引，這是「連動」的關鍵
+options = ["到校", "請假", "未到"]
+current_idx = options.index(st.session_state.default_status)
+
 for student in current_students:
-    # 調整欄位比例：名字(1.2) | 狀態按鈕(2.8) | 原因空格(2)
-    col1, col2, col3 = st.columns([1.2, 2.8, 2])
+    # 欄位比例分配：名字 | 狀態單選 | 原因小空格
+    col1, col2, col3 = st.columns([1, 3, 2])
     
     with col1:
         st.write(f"**{student}**")
         
     with col2:
-        options = ["到校", "請假", "未到"]
-        # 關鍵連動：使用 index 變數讓按鈕控制選項
-        idx = options.index(st.session_state.default_status)
+        # 重點：index=current_idx 讓下方的 radio 會聽從快速操作按鈕的指令
         status = st.radio(
-            f"S-{student}", options, index=idx, horizontal=True, 
-            key=f"s_{classroom}_{student}", label_visibility="collapsed"
+            f"S-{student}", options, 
+            index=current_idx, 
+            horizontal=True, 
+            key=f"s_{classroom}_{student}", 
+            label_visibility="collapsed"
         )
         status_dict[student] = status
         
     with col3:
-        # 只有在「請假」或「未到」時，才在右側小格子顯示原因輸入
+        # 只有在「請假」或「未到」時才顯示原因輸入框
         if status in ["請假", "未到"]:
             reason = st.text_input(
                 f"R-{student}", 
@@ -77,7 +82,6 @@ for student in current_students:
             reason_dict[student] = reason
         else:
             reason_dict[student] = ""
-            st.write("") # 保持對齊
 
 st.divider()
 
@@ -87,14 +91,10 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
         now_time = datetime.now().strftime("%H:%M:%S")
         for name, stat in status_dict.items():
             payload = {
-                "date": today, 
-                "classroom": classroom, 
-                "lesson": lesson_name,
-                "name": name, 
-                "status": stat, 
-                "time": now_time,
+                "date": today, "classroom": classroom, "lesson": lesson_name,
+                "name": name, "status": stat, "time": now_time,
                 "note": reason_dict[name]
             }
             requests.post(SCRIPT_URL, data=json.dumps(payload))
-        st.success("🎉 資料已成功同步至 Google 表單！")
+        st.success("🎉 資料已成功同步！")
         st.balloons()
