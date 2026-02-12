@@ -37,7 +37,7 @@ all_data = {
     }
 }
 
-# --- 2. 狀態與時間管理 ---
+# --- 2. 狀態管理 ---
 today_dt = datetime.now()
 today_str = today_dt.strftime("%Y-%m-%d")
 weekday_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
@@ -90,25 +90,29 @@ with c2:
 
 st.divider()
 
-# 點名區：加大空格與人名大字體
+# 點名區：人名對齊且縮短與選項距離
 status_results = {}
 for class_name, name in students:
     full_id = f"{class_name}_{name}"
-    # 比例調整為 4:4:2 以確保大名字有空間
-    col1, col2, col3 = st.columns([4, 4, 2])
+    # 比例微調為 5:4:1，讓名字和選項更靠近
+    col1, col2, col3 = st.columns([5, 4, 1])
     with col1: 
-        # 班級正常、名字大字體 (24px) 且中間空三大格
+        # 使用 inline-block 確保班級寬度固定(80px)，人名起頭就會對齊
         st.markdown(f"""
             <div style='display: flex; align-items: center;'>
-                <span style='color: gray; font-size: 14px;'>{class_name}</span>
-                <span style='margin-left: 30px; font-size: 24px; font-weight: bold;'>{name}</span>
+                <div style='width: 80px; color: gray; font-size: 14px;'>{class_name}</div>
+                <div style='font-size: 24px; font-weight: bold; margin-left: 10px;'>{name}</div>
             </div>
         """, unsafe_allow_html=True)
     with col2:
         res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
         status_results[full_id] = (class_name, name, res)
     with col3:
-        note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+        # 如果不是「到校」，顯示一個小驚嘆號提醒輸入備註
+        if res != "到校":
+            note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因")
+        else:
+            note = ""
         status_results[full_id] += (note,)
 
 # --- 5. 儲存與下載 ---
