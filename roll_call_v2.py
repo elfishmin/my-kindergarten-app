@@ -5,12 +5,20 @@ import requests
 import json
 
 # ==========================================
-# 1. 基本設定
+# 1. 基本設定 (已記住您的 URL)
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-st.set_page_config(page_title="才藝班點名-極速版", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="才藝班智慧點名", page_icon="🏫", layout="wide")
 
-# 完整名單 (略，請保留您原本程式碼中的 raw_data 內容)
+# 2. 定義 2025 課表分組
+# 星期一
+mon_classes = ["足球", "直排輪", "積木B", "桌遊", "陶土", "美語A一", "美語A三", "美語B二", "美語B四"]
+# 星期二
+tue_classes = ["美術"]
+# 暫時未排入名單但存在的 (如積木A, 舞蹈A, 感統A/B) 先歸類到其他
+other_classes = ["積木A", "舞蹈A", "感統A", "感統B"]
+
+# 完整名單資料 (raw_data 保持不變，此處省略以節省空間)
 raw_data = {
     "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")],
     "桌遊": [("大一班 粉蠟筆", "吳鎧崴"), ("大一班 粉蠟筆", "鐘苡禎"), ("大二班 紫葡萄", "黃芊熒"), ("大二班 紫葡萄", "蘇祐森"), ("大二班 綠格子", "陳語棠"), ("中二班 冰淇淋", "徐承睿")],
@@ -27,96 +35,63 @@ raw_data = {
     "美語B四": [("大二班 綠格子", "蔡枍廷")]
 }
 
-today = datetime.now().strftime("%Y-%m-%d")
+# --- 3. 獲取今天星期幾與狀態 ---
+today_dt = datetime.now()
+today_str = today_dt.strftime("%Y-%m-%d")
+weekday = today_dt.weekday() # 0=Mon, 1=Tue...
 
-# --- 2. 狀態管理與強制同步 ---
-# 檢查是否有 done_list，若無則初始化並同步一次
 if 'done_list' not in st.session_state:
     st.session_state.done_list = []
-    # 第一次啟動時，主動去問一次雲端
+
+def sync_data():
     try:
-        r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=3)
+        r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=10)
         if r.status_code == 200:
             st.session_state.done_list = r.json()
-    except:
-        pass
+    except: pass
 
-def manual_sync():
-    """ 手動強制刷新邏輯 """
-    try:
-        r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=5)
-        if r.status_code == 200:
-            st.session_state.done_list = r.json()
-            st.toast("同步成功！已取得最新進度", icon="☁️")
-        else:
-            st.toast("雲端回報錯誤", icon="❌")
-    except Exception as e:
-        st.toast(f"網路連線超時", icon="⚠️")
-
-# --- 3. 側邊欄：帶勾顯示 ---
+# --- 4. 側邊欄：按星期排序 ---
 with st.sidebar:
-    st.title("🎨 才藝班點名")
-    st.button("🔄 同步雲端進度", on_click=manual_sync, use_container_width=True)
-    st.divider()
+    st.title("🗓️ 課程排程")
+    if st.button("🔄 刷新進度", use_container_width=True):
+        sync_data()
     
-    # 建立選項與對應表
-    display_options = []
+    # 建立排序清單
+    sections = [
+        ("星期一 Mon", mon_classes, 0),
+        ("星期二 Tue", tue_classes, 1),
+        ("其他課程", other_classes, -1)
+    ]
+    
+    all_display_options = []
     mapping = {}
-    for c in raw_data.keys():
-        # 從 st.session_state.done_list 判斷是否打勾
-        icon = "✅" if c in st.session_state.done_list else "⚪"
-        label = f"{icon} {c}"
-        display_options.append(label)
-        mapping[label] = c
     
-    selected_label = st.radio("課程清單", display_options, key="nav_radio", label_visibility="collapsed")
-    current_class = mapping[selected_label]
+    for title, c_list, w_idx in sections:
+        header = f"🔹 {title}"
+        if weekday == w_idx:
+            header += " (📌 今日)"
+        st.markdown(f"**{header}**")
+        
+        for c in c_list:
+            if c in raw_data:
+                icon = "✅" if c in st.session_state.done_list else "⚪"
+                label = f"{icon} {c}"
+                # 使用 button 或 radio
+                if st.sidebar.button(label, key=f"btn_{c}", use_container_width=True):
+                    st.session_state.current_class = c
+        st.write("")
 
-# --- 4. 主畫面 ---
+# 初始化預設班級 (若是週二就預設美術)
+if 'current_class' not in st.session_state:
+    st.session_state.current_class = "美術" if weekday == 1 else "足球"
+
+# --- 5. 主畫面 ---
+current_class = st.session_state.current_class
 st.title(f"🍎 {current_class}")
 
 if current_class in st.session_state.done_list:
-    st.success("🎉 此班級今日已完成點名 (修正後儲存將覆蓋舊紀錄)")
+    st.success("今日已點名完成")
 
 st.divider()
 
-# 點名介面渲染
-status_dict = {}
-reason_dict = {}
-students = raw_data[current_class]
-
-for class_name, name in students:
-    full_id = f"{class_name} {name}"
-    c1, c2, c3 = st.columns([1.5, 3, 2])
-    with c1: st.markdown(f"**{full_id}**")
-    with c2:
-        res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
-        status_dict[full_id] = (class_name, name, res)
-    with c3:
-        if res != "到校":
-            reason_dict[full_id] = st.text_input("原因", key=f"r_{full_id}", label_visibility="collapsed", placeholder="原因")
-        else: reason_dict[full_id] = ""
-
-# --- 5. 儲存邏輯 ---
-if st.button("🚀 儲存並提交紀錄", type="primary", use_container_width=True):
-    # 1. 樂觀標記：讓側邊欄立刻變勾勾
-    if current_class not in st.session_state.done_list:
-        st.session_state.done_list.append(current_class)
-    
-    # 2. 準備資料
-    now_time = datetime.now().strftime("%H:%M:%S")
-    payload = [{
-        "date": today, "classroom": current_class, "lesson": cn, "name": sn, "status": s, "time": now_time, "note": reason_dict.get(f"{cn} {sn}", "")
-    } for cn, sn, s in status_dict.values()]
-    
-    # 3. 傳送
-    try:
-        with st.spinner("傳送中..."):
-            r = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=8)
-            if r.status_code == 200:
-                st.toast(f"✅ {current_class} 儲存成功", icon='🎉')
-                st.rerun() # 點完立即重繪以確保 ✅ 狀態被鎖定
-            else:
-                st.error("寫入失敗，請確認網路或 URL 是否正確")
-    except:
-        st.error("網路超時，但資料可能已排程送出，請刷新確認")
+# 一鍵到
