@@ -8,9 +8,9 @@ import json
 # 1. 基本設定
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-st.set_page_config(page_title="極速點名", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="極速點名系統", page_icon="⚡", layout="wide")
 
-# 這裡放入你提供的完整 raw_data 名單... (保持不變)
+# 完整名單資料
 raw_data = {
     "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")],
     "桌遊": [("大一班 粉蠟筆", "吳鎧崴"), ("大一班 粉蠟筆", "鐘苡禎"), ("大二班 紫葡萄", "黃芊熒"), ("大二班 紫葡萄", "蘇祐森"), ("大二班 綠格子", "陳語棠"), ("中二班 冰淇淋", "徐承睿")],
@@ -33,38 +33,46 @@ today = datetime.now().strftime("%Y-%m-%d")
 if 'done_list' not in st.session_state:
     st.session_state.done_list = []
 
-# 強制刷新函數 (只有按按鈕才觸發)
+# 同步函數：只有按按鈕才執行網路請求
 def force_sync():
     try:
         r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=3)
-        st.session_state.done_list = r.json()
-    except: pass
+        if r.status_code == 200:
+            st.session_state.done_list = r.json()
+    except:
+        st.toast("同步失敗，請檢查網路", icon="⚠️")
 
-# --- 3. 側邊欄 ---
+# --- 3. 側邊欄：直接在選項後顯示打勾 ---
 with st.sidebar:
-    st.title(" 才藝班")
-    if st.button("🔄 同步進度", use_container_width=True):
-        force_sync()
+    st.title("🎨 才藝班點名")
+    st.button("🔄 同步雲端狀態", on_click=force_sync, use_container_width=True)
+    st.write("") # 間隔
     
-    # 建立純文字選項清單，減少圖示計算
-    choice = st.radio("課程清單", list(raw_data.keys()), key="nav")
+    # 關鍵邏輯：動態生成選項文字
+    # 範例： "美術 ✅" 或 "美術"
+    display_options = []
+    class_map = {} # 用來把「帶勾的名字」對應回「原本的名字」
     
-    # 顯示已完成標籤
-    st.markdown("---")
-    st.caption("今日已完成：")
-    for d in st.session_state.done_list:
-        st.write(f"✅ {d}")
+    for c in raw_data.keys():
+        label = f"{c} ✅" if c in st.session_state.cloud_done else c
+        display_options.append(label)
+        class_map[label] = c
+    
+    # 渲染 Radio 選單
+    selected_label = st.radio("課程清單", display_options, key="nav_radio", label_visibility="collapsed")
+    current_class = class_map[selected_label]
 
-# --- 4. 主畫面 (極簡化渲染) ---
-classroom = st.session_state.nav
-st.title(f"🍎 {classroom}")
+# --- 4. 主畫面 ---
+st.title(f"🍎 {current_class}")
+if current_class in st.session_state.done_list:
+    st.success(f"此班級已於今日點名完成 (可直接修改後再次送出)")
 
-# 點名介面
+st.divider()
+
 status_dict = {}
 reason_dict = {}
-students = raw_data[classroom]
+students = raw_data[current_class]
 
-# 使用 container 包裹提升渲染穩定性
 with st.container():
     for class_name, name in students:
         full_id = f"{class_name} {name}"
@@ -80,17 +88,18 @@ with st.container():
 
 # --- 5. 送出邏輯 ---
 if st.button("🚀 儲存紀錄", type="primary", use_container_width=True):
-    # 立即反映在本地，不等待 API
-    if classroom not in st.session_state.done_list:
-        st.session_state.done_list.append(classroom)
+    # 樂觀更新：點下去瞬間就在左側打勾，不需要等網路回傳
+    if current_class not in st.session_state.done_list:
+        st.session_state.done_list.append(current_class)
     
     payload = [{
-        "date": today, "classroom": classroom, "lesson": cn, "name": sn, "status": s, "time": datetime.now().strftime("%H:%M:%S"), "note": reason_dict.get(f"{cn} {sn}", "")
+        "date": today, "classroom": current_class, "lesson": cn, "name": sn, "status": s, "time": datetime.now().strftime("%H:%M:%S"), "note": reason_dict.get(f"{cn} {sn}", "")
     } for cn, sn, s in status_dict.values()]
     
     try:
-        # 使用快速請求，不卡死主執行緒
+        # 非同步傳送概念：用 toast 讓使用者知道開始傳了，不阻塞操作
         requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=5)
-        st.toast("✅ 資料已傳送至雲端", icon='🎉')
+        st.toast(f"✅ {current_class} 資料已更新", icon='🎉')
+        st.rerun() # 重新整理頁面以更新左側勾勾
     except:
-        st.error("傳送失敗，請檢查網路")
+        st.error("傳送失敗，請稍後重試")
