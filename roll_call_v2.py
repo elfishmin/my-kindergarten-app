@@ -101,3 +101,4 @@ if st.button("🚀 確認提交點名紀錄", type="primary", use_container_widt
                 st.error("連線失敗，請檢查 Google Script 部署。")
         except Exception as e:
             st.error(f"發生錯誤: {e}")
+
