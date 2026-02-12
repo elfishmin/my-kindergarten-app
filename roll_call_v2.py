@@ -11,11 +11,11 @@ SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60
 
 st.set_page_config(page_title="才藝班雲端點名系統", page_icon="🎨", layout="wide")
 
-# 初始化提交狀態
+# 初始化提交狀態與記錄目前班級
 if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 
-# 2. 才藝班學生名單 (從 CSV 提取)
+# 2. 才藝班學生名單 (格式：班別, 姓名)
 raw_data = {
     "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")],
     "直排輪": [("大一班 粉蠟筆", "陳愷蒂"), ("大一班 粉蠟筆", "劉恩谷"), ("大一班 藍天使", "周星宇"), ("大二班 紫葡萄", "吳尚恩"), ("大二班 紫葡萄", "林予煖"), ("大二班 綠格子", "張哲銘"), ("中二班 冰淇淋", "吳承浚"), ("中二班 冰淇淋", "宋宥希")],
@@ -30,9 +30,16 @@ raw_data = {
     "感統B": [("中二班 冰淇淋", "范芯瑀"), ("中二班 冰淇淋", "張簡睿泱")]
 }
 
-# 側邊欄設定
-st.sidebar.header("⚙️ 才藝班管理")
-classroom = st.sidebar.selectbox("選擇才藝班", list(raw_data.keys()))
+# --- 3. 側邊欄：直接列出所有班級按鈕 (取代選單) ---
+st.sidebar.header("🎨 才藝班列表")
+# 使用 radio 作為垂直導覽列，這會讓所有選項直接顯示在左側
+classroom = st.sidebar.radio(
+    "請選擇班級：",
+    options=list(raw_data.keys()),
+    key="class_navigator",
+    label_visibility="collapsed" # 隱藏標題讓介面更乾淨
+)
+
 today = datetime.now().strftime("%Y-%m-%d")
 
 # 當切換班級時，重置提交狀態
@@ -40,12 +47,12 @@ if 'last_classroom' not in st.session_state or st.session_state.last_classroom !
     st.session_state.submitted = False
     st.session_state.last_classroom = classroom
 
-st.title(f"🎨 {classroom} 點名系統")
-st.write(f"日期：{today}")
-
+# 主畫面標題
+st.title(f"🍎 {classroom} 點名系統")
+st.write(f"今日日期：{today}")
 st.divider()
 
-# --- 3. 點名介面 ---
+# --- 4. 點名介面 ---
 status_dict = {}
 reason_dict = {}
 student_info_list = raw_data[classroom]
@@ -82,11 +89,9 @@ for class_name, name in student_info_list:
 
 st.divider()
 
-# --- 4. 提交邏輯與二次確認 ---
-
-# 定義提交函式
+# --- 5. 提交邏輯與二次確認 ---
 def send_data():
-    with st.spinner('正在更新雲端試算表...'):
+    with st.spinner('同步資料中...'):
         now_time = datetime.now().strftime("%H:%M:%S")
         payload_list = []
         for key, (c_name, s_name, stat) in status_dict.items():
@@ -113,10 +118,9 @@ def send_data():
 
 # 提交按鈕邏輯
 if not st.session_state.submitted:
-    if st.button("🚀 確認提交點名紀錄", type="primary", use_container_width=True):
+    if st.button(f"🚀 確認提交【{classroom}】點名紀錄", type="primary", use_container_width=True):
         send_data()
 else:
-    # 如果已經提交過，顯示再次確認
-    st.warning("⚠️ 此班級今日已完成點名。")
-    if st.button("🔄 資料有誤，確認再次提交修改", type="secondary", use_container_width=True):
+    st.warning(f"⚠️ {classroom} 今日已完成點名。")
+    if st.button(f"🔄 修改並重新提交【{classroom}】紀錄", type="secondary", use_container_width=True):
         send_data()
