@@ -7,7 +7,7 @@ import json
 # ==========================================
 # 1. 參數設定
 # ==========================================
-SCRIPT_URL = "您的_SCRIPT_URL"
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 st.set_page_config(page_title="幼稚園才藝點名", page_icon="⚡", layout="wide")
 
 # 狀態初始化
@@ -84,3 +84,4 @@ if st.button(btn_text, type="primary", use_container_width=True):
                 st.balloons()
             else: st.error("連線超時")
         except: st.error("網路異常")
+
