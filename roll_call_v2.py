@@ -43,42 +43,42 @@ with col_btn2:
 
 st.divider()
 
-# 5. 點名介面 (增加原因輸入框)
+# 5. 點名介面
 status_dict = {}
 reason_dict = {} # 用來存原因
 current_students = students_data[classroom]
 
 for student in current_students:
-    # 建立三欄：名字、狀態、備註
-    col_n, col_s, col_r = st.columns([1, 2, 2])
-    
-    with col_n:
-        st.write(f"**{student}**")
-        
-    for student in current_students:
-    # 只分兩欄：名字、狀態
+    # 建立兩欄：名字(1) 與 狀態按鈕(3)，避免按鈕被擠掉
     col1, col2 = st.columns([1, 3])
+    
     with col1:
         st.write(f"**{student}**")
+        
     with col2:
         options = ["到校", "請假", "未到"]
+        # 根據快速操作按鈕的選擇，動態設定 index
         idx = options.index(st.session_state.default_status)
         status = st.radio(
             f"S-{student}", options, index=idx, horizontal=True, 
             key=f"s_{classroom}_{student}", label_visibility="collapsed"
         )
         status_dict[student] = status
-
-    # 如果是請假或未到，直接在下方顯示輸入框
+        
+    # 如果狀態是「請假」或「未到」，在下方顯示原因輸入框
     if status in ["請假", "未到"]:
         reason = st.text_input(
-            f"原因-{student}", placeholder=f"請輸入{student}的{status}原因...", 
+            f"原因-{student}", 
+            placeholder=f"請輸入{student}的{status}原因...", 
             key=f"r_{classroom}_{student}"
         )
         reason_dict[student] = reason
     else:
         reason_dict[student] = ""
-    st.write("") # 增加一點間距st.divider()
+    
+    st.write("") # 增加學生之間的間距
+
+st.divider()
 
 # 6. 提交
 if st.button("🚀 確認提交", type="primary", use_container_width=True):
@@ -86,11 +86,14 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
         now_time = datetime.now().strftime("%H:%M:%S")
         for name, stat in status_dict.items():
             payload = {
-                "date": today, "classroom": classroom, "lesson": lesson_name,
-                "name": name, "status": stat, "time": now_time,
+                "date": today, 
+                "classroom": classroom, 
+                "lesson": lesson_name,
+                "name": name, 
+                "status": stat, 
+                "time": now_time,
                 "note": reason_dict[name] # 把原因也傳出去
             }
             requests.post(SCRIPT_URL, data=json.dumps(payload))
         st.success("🎉 已成功上傳！")
         st.balloons()
-
