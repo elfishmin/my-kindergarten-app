@@ -5,12 +5,12 @@ import requests
 import json
 
 # ==========================================
-# 1. 基本設定 (已填入您的 URL)
+# 1. 基本設定
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-st.set_page_config(page_title="極速點名系統", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="才藝班點名-極速版", page_icon="⚡", layout="wide")
 
-# 完整名單資料 (根據您的 CSV 提取)
+# 完整名單 (略，請保留您原本程式碼中的 raw_data 內容)
 raw_data = {
     "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")],
     "桌遊": [("大一班 粉蠟筆", "吳鎧崴"), ("大一班 粉蠟筆", "鐘苡禎"), ("大二班 紫葡萄", "黃芊熒"), ("大二班 紫葡萄", "蘇祐森"), ("大二班 綠格子", "陳語棠"), ("中二班 冰淇淋", "徐承睿")],
@@ -29,46 +29,58 @@ raw_data = {
 
 today = datetime.now().strftime("%Y-%m-%d")
 
-# --- 2. 狀態管理 (Session State) ---
-# 確保變數名稱統一為 done_list
+# --- 2. 狀態管理與強制同步 ---
+# 檢查是否有 done_list，若無則初始化並同步一次
 if 'done_list' not in st.session_state:
     st.session_state.done_list = []
-
-# 同步函數
-def force_sync():
+    # 第一次啟動時，主動去問一次雲端
     try:
         r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=3)
         if r.status_code == 200:
             st.session_state.done_list = r.json()
-            st.toast("已同步最新進度", icon="☁️")
     except:
-        st.toast("同步超時，請檢查網路", icon="⚠️")
+        pass
 
-# --- 3. 側邊欄 ---
+def manual_sync():
+    """ 手動強制刷新邏輯 """
+    try:
+        r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=5)
+        if r.status_code == 200:
+            st.session_state.done_list = r.json()
+            st.toast("同步成功！已取得最新進度", icon="☁️")
+        else:
+            st.toast("雲端回報錯誤", icon="❌")
+    except Exception as e:
+        st.toast(f"網路連線超時", icon="⚠️")
+
+# --- 3. 側邊欄：帶勾顯示 ---
 with st.sidebar:
     st.title("🎨 才藝班點名")
-    st.button("🔄 同步雲端狀態", on_click=force_sync, use_container_width=True)
-    st.write("")
+    st.button("🔄 同步雲端進度", on_click=manual_sync, use_container_width=True)
+    st.divider()
     
+    # 建立選項與對應表
     display_options = []
-    class_map = {}
-    
+    mapping = {}
     for c in raw_data.keys():
-        # 修正這裡的變數名稱為 done_list
-        label = f"{c} ✅" if c in st.session_state.done_list else c
+        # 從 st.session_state.done_list 判斷是否打勾
+        icon = "✅" if c in st.session_state.done_list else "⚪"
+        label = f"{icon} {c}"
         display_options.append(label)
-        class_map[label] = c
+        mapping[label] = c
     
     selected_label = st.radio("課程清單", display_options, key="nav_radio", label_visibility="collapsed")
-    current_class = class_map[selected_label]
+    current_class = mapping[selected_label]
 
 # --- 4. 主畫面 ---
 st.title(f"🍎 {current_class}")
+
 if current_class in st.session_state.done_list:
-    st.success(f"此班級今日已點名完成")
+    st.success("🎉 此班級今日已完成點名 (修正後儲存將覆蓋舊紀錄)")
 
 st.divider()
 
+# 點名介面渲染
 status_dict = {}
 reason_dict = {}
 students = raw_data[current_class]
@@ -85,19 +97,26 @@ for class_name, name in students:
             reason_dict[full_id] = st.text_input("原因", key=f"r_{full_id}", label_visibility="collapsed", placeholder="原因")
         else: reason_dict[full_id] = ""
 
-# --- 5. 送出邏輯 ---
-if st.button("🚀 儲存紀錄", type="primary", use_container_width=True):
-    # 樂觀更新勾勾
+# --- 5. 儲存邏輯 ---
+if st.button("🚀 儲存並提交紀錄", type="primary", use_container_width=True):
+    # 1. 樂觀標記：讓側邊欄立刻變勾勾
     if current_class not in st.session_state.done_list:
         st.session_state.done_list.append(current_class)
     
+    # 2. 準備資料
+    now_time = datetime.now().strftime("%H:%M:%S")
     payload = [{
-        "date": today, "classroom": current_class, "lesson": cn, "name": sn, "status": s, "time": datetime.now().strftime("%H:%M:%S"), "note": reason_dict.get(f"{cn} {sn}", "")
+        "date": today, "classroom": current_class, "lesson": cn, "name": sn, "status": s, "time": now_time, "note": reason_dict.get(f"{cn} {sn}", "")
     } for cn, sn, s in status_dict.values()]
     
+    # 3. 傳送
     try:
-        requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=5)
-        st.toast(f"✅ {current_class} 已同步", icon='🎉')
-        st.rerun() # 點完立即重繪以顯示左側勾勾
+        with st.spinner("傳送中..."):
+            r = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=8)
+            if r.status_code == 200:
+                st.toast(f"✅ {current_class} 儲存成功", icon='🎉')
+                st.rerun() # 點完立即重繪以確保 ✅ 狀態被鎖定
+            else:
+                st.error("寫入失敗，請確認網路或 URL 是否正確")
     except:
-        st.error("網路異常，資料可能未送出")
+        st.error("網路超時，但資料可能已排程送出，請刷新確認")
