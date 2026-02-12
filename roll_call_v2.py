@@ -96,3 +96,4 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
                 st.error(f"連線失敗，請檢查 Script 部署權限。 (錯誤碼: {response.status_code})")
         except Exception as e:
             st.error(f"發生非預期錯誤: {e}")
+
