@@ -5,12 +5,12 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定
+# 1. 基本設定
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 st.set_page_config(page_title="才藝班點名系統", page_icon="🏫", layout="wide")
 
-# 完整 13 門課表與名單 (對應 2025 課表)
+# 完整 13 門課表與名單 (對應您提供的 2025 課表)
 all_data = {
     "星期一 (Mon)": {
         "足球": [("大一班 粉蠟筆", "謝恩典"), ("大一班 藍天使", "吳秉宸"), ("大一班 藍天使", "黃彥淇"), ("中二班 冰淇淋", "宋宥希")],
@@ -28,56 +28,4 @@ all_data = {
         "感統B": [("中二班 冰淇淋", "范芯瑀"), ("中二班 冰淇淋", "張簡睿泱")]
     },
     "星期二 (Tue)": {
-        "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")]
-    }
-}
-
-today_dt = datetime.now()
-today_str = today_dt.strftime("%Y-%m-%d")
-weekday_idx = today_dt.weekday() 
-
-# --- 2. 狀態管理 ---
-if 'done_list' not in st.session_state:
-    st.session_state.done_list = []
-if 'current_class' not in st.session_state:
-    st.session_state.current_class = "美術" if weekday_idx == 1 else "足球"
-
-def sync_data():
-    try:
-        r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
-        if r.status_code == 200:
-            st.session_state.done_list = r.json()
-            st.toast("同步成功", icon="✅")
-    except:
-        st.toast("雲端同步中...", icon="⏳")
-
-# --- 3. 側邊欄 ---
-with st.sidebar:
-    st.title("🗓️ 才藝點名")
-    if st.button("🔄 刷新雲端狀態", use_container_width=True):
-        sync_data()
-    
-    st.divider()
-    for day_name, classes in all_data.items():
-        is_today = (day_name.startswith("星期一") and weekday_idx == 0) or \
-                   (day_name.startswith("星期二") and weekday_idx == 1)
-        st.markdown(f"### {'🟢' if is_today else '⚪'} {day_name}")
-        for c in classes.keys():
-            icon = "✅" if c in st.session_state.done_list else "📝"
-            if st.button(f"{icon} {c}", key=f"btn_{c}", use_container_width=True):
-                st.session_state.current_class = c
-
-# --- 4. 主畫面 ---
-current_class = st.session_state.current_class
-students = []
-for day in all_data:
-    if current_class in all_data[day]:
-        students = all_data[day][current_class]
-        break
-
-st.title(f"🍎 {current_class}")
-
-# 快速功能
-c_a, c_b = st.columns(2)
-with c_a:
-    if
+        "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許
