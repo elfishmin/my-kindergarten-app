@@ -45,4 +45,83 @@ if 'current_class' not in st.session_state:
 
 def sync_data():
     try:
-        r = requests.get(f"{SCRIPT_URL}?date={
+        r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
+        if r.status_code == 200:
+            st.session_state.done_list = r.json()
+            st.toast("同步成功", icon="✅")
+    except:
+        st.toast("雲端同步中...", icon="⏳")
+
+# --- 3. 側邊欄 ---
+with st.sidebar:
+    st.title("🗓️ 才藝點名系統")
+    if st.button("🔄 刷新雲端狀態", use_container_width=True):
+        sync_data()
+    
+    st.divider()
+    for day_name, classes in all_data.items():
+        is_today = (day_name.startswith("星期一") and weekday_idx == 0) or \
+                   (day_name.startswith("星期二") and weekday_idx == 1)
+        st.markdown(f"### {'🟢' if is_today else '⚪'} {day_name}")
+        for c in classes.keys():
+            # 顯示勾勾代表已點名
+            icon = "✅" if c in st.session_state.done_list else "📝"
+            if st.button(f"{icon} {c}", key=f"btn_{c}", use_container_width=True):
+                st.session_state.current_class = c
+
+# --- 4. 主畫面渲染 ---
+# 這裡確保使用的是 current_class 而非被截斷的變數
+active_class = st.session_state.current_class
+students = []
+for day in all_data:
+    if active_class in all_data[day]:
+        students = all_data[day][current_day_classes := all_data[day][active_class]]
+        students = current_day_classes
+        break
+
+st.title(f"🍎 當前課程：{active_class}")
+
+# 快速功能按鈕
+col_a, col_b = st.columns(2)
+with col_a:
+    if st.button("🙋‍♂️ 全員到校", use_container_width=True):
+        for cn, sn in students: st.session_state[f"s_{cn} {sn}"] = "到校"
+with col_b:
+    if st.button("🧹 重置名單", use_container_width=True):
+        for cn, sn in students: st.session_state[f"s_{cn} {sn}"] = "到校"
+
+st.divider()
+
+# 顯示小朋友點名列表
+status_results = {}
+for class_name, name in students:
+    full_id = f"{class_name} {name}"
+    c1, c2, c3 = st.columns([2, 3, 2])
+    with c1: st.write(f"**{full_id}**")
+    with c2:
+        res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
+        status_results[full_id] = (class_name, name, res)
+    with c3:
+        note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+        status_results[full_id] += (note,)
+
+# --- 5. 儲存紀錄 ---
+if st.button("🚀 儲存紀錄", type="primary", use_container_width=True):
+    # 樂觀更新勾勾狀態
+    if active_class not in st.session_state.done_list:
+        st.session_state.done_list.append(active_class)
+    
+    payload = [{
+        "date": today_str, "classroom": active_class, "lesson": item[0], "name": item[1], 
+        "status": item[2], "time": datetime.now().strftime("%H:%M:%S"), "note": item[3]
+    } for item in status_results.values()]
+    
+    try:
+        # 短暫發送，不讓 Google 延遲造成 App 卡頓
+        requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=0.5)
+        st.toast("✅ 指令已發送！", icon="🎉")
+    except:
+        st.toast("✅ 已送出，正在更新 Excel", icon="🎉")
+    
+    time.sleep(0.5)
+    st.rerun()
