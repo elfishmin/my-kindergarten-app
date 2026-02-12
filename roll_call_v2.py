@@ -9,7 +9,7 @@ import json
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 
-st.set_page_config(page_title="雲端點名系統", page_icon="🍎")
+st.set_page_config(page_title="雲端點名系統", page_icon="🍎", layout="wide")
 
 # 2. 學生名單
 students_data = {
@@ -26,7 +26,7 @@ today = datetime.now().strftime("%Y-%m-%d")
 
 st.title(f"🍎 {classroom} 點名系統")
 
-# --- 4. 快速操作 (增加 st.rerun 強制重繪) ---
+# --- 4. 快速操作 (連動邏輯核心) ---
 if 'default_status' not in st.session_state:
     st.session_state.default_status = "到校"
 
@@ -45,19 +45,19 @@ st.divider()
 
 # 5. 點名介面
 status_dict = {}
-reason_dict = {} # 用來存原因
+reason_dict = {}
 current_students = students_data[classroom]
 
 for student in current_students:
-    # 建立兩欄：名字(1) 與 狀態按鈕(3)，避免按鈕被擠掉
-    col1, col2 = st.columns([1, 3])
+    # 調整欄位比例：名字(1.2) | 狀態按鈕(2.8) | 原因空格(2)
+    col1, col2, col3 = st.columns([1.2, 2.8, 2])
     
     with col1:
         st.write(f"**{student}**")
         
     with col2:
         options = ["到校", "請假", "未到"]
-        # 根據快速操作按鈕的選擇，動態設定 index
+        # 關鍵連動：使用 index 變數讓按鈕控制選項
         idx = options.index(st.session_state.default_status)
         status = st.radio(
             f"S-{student}", options, index=idx, horizontal=True, 
@@ -65,18 +65,19 @@ for student in current_students:
         )
         status_dict[student] = status
         
-    # 如果狀態是「請假」或「未到」，在下方顯示原因輸入框
-    if status in ["請假", "未到"]:
-        reason = st.text_input(
-            f"原因-{student}", 
-            placeholder=f"請輸入{student}的{status}原因...", 
-            key=f"r_{classroom}_{student}"
-        )
-        reason_dict[student] = reason
-    else:
-        reason_dict[student] = ""
-    
-    st.write("") # 增加學生之間的間距
+    with col3:
+        # 只有在「請假」或「未到」時，才在右側小格子顯示原因輸入
+        if status in ["請假", "未到"]:
+            reason = st.text_input(
+                f"R-{student}", 
+                placeholder="原因...", 
+                key=f"r_{classroom}_{student}",
+                label_visibility="collapsed"
+            )
+            reason_dict[student] = reason
+        else:
+            reason_dict[student] = ""
+            st.write("") # 保持對齊
 
 st.divider()
 
@@ -92,8 +93,8 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
                 "name": name, 
                 "status": stat, 
                 "time": now_time,
-                "note": reason_dict[name] # 把原因也傳出去
+                "note": reason_dict[name]
             }
             requests.post(SCRIPT_URL, data=json.dumps(payload))
-        st.success("🎉 已成功上傳！")
+        st.success("🎉 資料已成功同步至 Google 表單！")
         st.balloons()
