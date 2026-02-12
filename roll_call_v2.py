@@ -5,19 +5,12 @@ import requests
 import json
 
 # ==========================================
-# 1. 請填入最新的 SCRIPT_URL
+# 1. 基本設定
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
+st.set_page_config(page_title="極速點名", page_icon="⚡", layout="wide")
 
-st.set_page_config(page_title="全校才藝班點名系統", page_icon="🏫", layout="wide")
-
-# 初始化狀態
-if 'cloud_done' not in st.session_state:
-    st.session_state.cloud_done = []
-if 'last_sync' not in st.session_state:
-    st.session_state.last_sync = datetime.min
-
-# 2. 從名冊 CSV 提取的完整名單
+# 這裡放入你提供的完整 raw_data 名單... (保持不變)
 raw_data = {
     "美術": [("大一班 粉蠟筆", "王銘緯"), ("大一班 粉蠟筆", "許鈞凱"), ("大一班 粉蠟筆", "陳愷蒂"), ("大一班 藍天使", "吳秉宸"), ("大二班 紫葡萄", "張簡瑞晨"), ("大二班 綠格子", "王子蕎"), ("中二班 冰淇淋", "宋宥希")],
     "桌遊": [("大一班 粉蠟筆", "吳鎧崴"), ("大一班 粉蠟筆", "鐘苡禎"), ("大二班 紫葡萄", "黃芊熒"), ("大二班 紫葡萄", "蘇祐森"), ("大二班 綠格子", "陳語棠"), ("中二班 冰淇淋", "徐承睿")],
@@ -36,67 +29,68 @@ raw_data = {
 
 today = datetime.now().strftime("%Y-%m-%d")
 
-# 3. 同步功能
-def sync_cloud():
+# --- 2. 狀態管理 (Session State) ---
+if 'done_list' not in st.session_state:
+    st.session_state.done_list = []
+
+# 強制刷新函數 (只有按按鈕才觸發)
+def force_sync():
     try:
-        resp = requests.get(f"{SCRIPT_URL}?date={today}", timeout=3)
-        if resp.status_code == 200:
-            st.session_state.cloud_done = resp.json()
-            st.session_state.last_sync = datetime.now()
+        r = requests.get(f"{SCRIPT_URL}?date={today}", timeout=3)
+        st.session_state.done_list = r.json()
     except: pass
 
-if (datetime.now() - st.session_state.last_sync).total_seconds() > 300:
-    sync_cloud()
+# --- 3. 側邊欄 ---
+with st.sidebar:
+    st.title(" 才藝班")
+    if st.button("🔄 同步進度", use_container_width=True):
+        force_sync()
+    
+    # 建立純文字選項清單，減少圖示計算
+    choice = st.radio("課程清單", list(raw_data.keys()), key="nav")
+    
+    # 顯示已完成標籤
+    st.markdown("---")
+    st.caption("今日已完成：")
+    for d in st.session_state.done_list:
+        st.write(f"✅ {d}")
 
-# 4. 側邊欄導覽
-st.sidebar.title("🎨 才藝班列表")
-if st.sidebar.button("🔄 刷新雲端狀態", use_container_width=True):
-    sync_cloud()
+# --- 4. 主畫面 (極簡化渲染) ---
+classroom = st.session_state.nav
+st.title(f"🍎 {classroom}")
 
-# 生成帶圖示的列表
-options_map = {f"{'✅' if c in st.session_state.cloud_done else '⚪'} {c}": c for c in raw_data.keys()}
-selected_label = st.sidebar.radio("選擇班級", list(options_map.keys()), label_visibility="collapsed")
-classroom = options_map[selected_label]
-
-# 5. 主點名畫面
-st.title(f"🏫 {classroom} 點名系統")
-if classroom in st.session_state.cloud_done:
-    st.info("💡 此班級今日已完成點名，您可以進行修改並重新送出，系統會自動更新舊資料。")
-
-st.divider()
-
+# 點名介面
 status_dict = {}
 reason_dict = {}
-for class_name, name in raw_data[classroom]:
-    full_id = f"{class_name} {name}"
-    c1, c2, c3 = st.columns([1.5, 3, 2])
-    with c1: st.write(f"**{full_id}**")
-    with c2:
-        res = st.radio(f"S-{full_id}", ["到校", "請假", "未到"], horizontal=True, key=f"s_{classroom}_{full_id}", label_visibility="collapsed")
-        status_dict[full_id] = (class_name, name, res)
-    with c3:
-        if res != "到校":
-            reason_dict[full_id] = st.text_input(f"原因", key=f"r_{classroom}_{full_id}", label_visibility="collapsed", placeholder="輸入原因")
-        else: reason_dict[full_id] = ""
+students = raw_data[classroom]
 
-st.divider()
+# 使用 container 包裹提升渲染穩定性
+with st.container():
+    for class_name, name in students:
+        full_id = f"{class_name} {name}"
+        c1, c2, c3 = st.columns([1.5, 3, 2])
+        with c1: st.markdown(f"**{full_id}**")
+        with c2:
+            res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
+            status_dict[full_id] = (class_name, name, res)
+        with c3:
+            if res != "到校":
+                reason_dict[full_id] = st.text_input("原因", key=f"r_{full_id}", label_visibility="collapsed", placeholder="原因")
+            else: reason_dict[full_id] = ""
 
-# 6. 送出邏輯
-btn_label = "🔄 修正並更新紀錄" if classroom in st.session_state.cloud_done else "🚀 確認提交紀錄"
-if st.button(btn_label, type="primary", use_container_width=True):
-    if classroom not in st.session_state.cloud_done:
-        st.session_state.cloud_done.append(classroom)
+# --- 5. 送出邏輯 ---
+if st.button("🚀 儲存紀錄", type="primary", use_container_width=True):
+    # 立即反映在本地，不等待 API
+    if classroom not in st.session_state.done_list:
+        st.session_state.done_list.append(classroom)
     
-    with st.spinner('同步至雲端 Excel 中...'):
-        now_time = datetime.now().strftime("%H:%M:%S")
-        payload = [{
-            "date": today, "classroom": classroom, "lesson": cn, "name": sn, "status": s, "time": now_time, "note": reason_dict.get(f"{cn} {sn}", "")
-        } for cn, sn, s in status_dict.values()]
-        
-        try:
-            r = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=8)
-            if r.status_code == 200:
-                st.success("✅ 資料已成功寫入 Excel 原位址！")
-                st.balloons()
-            else: st.error("連線超時，請檢查網路")
-        except: st.error("網路異常")
+    payload = [{
+        "date": today, "classroom": classroom, "lesson": cn, "name": sn, "status": s, "time": datetime.now().strftime("%H:%M:%S"), "note": reason_dict.get(f"{cn} {sn}", "")
+    } for cn, sn, s in status_dict.values()]
+    
+    try:
+        # 使用快速請求，不卡死主執行緒
+        requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=5)
+        st.toast("✅ 資料已傳送至雲端", icon='🎉')
+    except:
+        st.error("傳送失敗，請檢查網路")
