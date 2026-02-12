@@ -55,7 +55,12 @@ for student in current_students:
     with col_n:
         st.write(f"**{student}**")
         
-    with col_s:
+    for student in current_students:
+    # 只分兩欄：名字、狀態
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.write(f"**{student}**")
+    with col2:
         options = ["到校", "請假", "未到"]
         idx = options.index(st.session_state.default_status)
         status = st.radio(
@@ -63,19 +68,17 @@ for student in current_students:
             key=f"s_{classroom}_{student}", label_visibility="collapsed"
         )
         status_dict[student] = status
-        
-    with col_r:
-        # 只有在「請假」或「未到」時才顯示輸入框
-        if status in ["請假", "未到"]:
-            reason = st.text_input(
-                f"原因-{student}", placeholder="請輸入原因...", 
-                key=f"r_{classroom}_{student}", label_visibility="collapsed"
-            )
-            reason_dict[student] = reason
-        else:
-            reason_dict[student] = ""
 
-st.divider()
+    # 如果是請假或未到，直接在下方顯示輸入框
+    if status in ["請假", "未到"]:
+        reason = st.text_input(
+            f"原因-{student}", placeholder=f"請輸入{student}的{status}原因...", 
+            key=f"r_{classroom}_{student}"
+        )
+        reason_dict[student] = reason
+    else:
+        reason_dict[student] = ""
+    st.write("") # 增加一點間距st.divider()
 
 # 6. 提交
 if st.button("🚀 確認提交", type="primary", use_container_width=True):
@@ -90,3 +93,4 @@ if st.button("🚀 確認提交", type="primary", use_container_width=True):
             requests.post(SCRIPT_URL, data=json.dumps(payload))
         st.success("🎉 已成功上傳！")
         st.balloons()
+
