@@ -6,7 +6,7 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定 (永遠顯示左側選單)
+# 1. 核心設定 (強制永久顯示側邊欄)
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 
@@ -14,20 +14,38 @@ st.set_page_config(
     page_title="才藝班點名系統", 
     page_icon="🏫", 
     layout="wide", 
-    initial_sidebar_state="expanded"  # 強制展開選單
+    initial_sidebar_state="expanded" 
 )
 
-# 使用 CSS 隱藏收合按鈕，讓選單永遠固定
+# 注入 CSS：強制 Sidebar 在小螢幕也不收合
 st.markdown("""
     <style>
+        /* 1. 隱藏左上角的收合/展開箭頭按鈕 */
         [data-testid="collapsedControl"] {
-            display: none;
+            display: none !important;
         }
+
+        /* 2. 強制側邊欄在手機版也保持顯示 (不移動到上方) */
+        @media (max-width: 991px) {
+            section[data-testid="stSidebar"] {
+                width: 250px !important;
+                position: relative !important;
+                margin-left: 0 !important;
+            }
+            .main {
+                margin-left: 20px !important;
+            }
+        }
+
+        /* 3. 調整單選框間距 */
         .stRadio [role=radiogroup] {
             gap: 10px;
         }
     </style>
 """, unsafe_allow_html=True)
+
+# --- 以下維持原有名單與邏輯 ---
+# ... (all_data 內容) ...
 
 # 完整 240+ 筆名單 (保持不變)
 all_data = {
@@ -154,3 +172,4 @@ with col_dl:
     df_export = pd.DataFrame([{"班級": i[0], "姓名": i[1], "狀態": i[2], "備註": i[3]} for i in status_results.values()])
     csv_data = df_export.to_csv(index=False).encode('utf-8-sig') 
     st.download_button(label="📥 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
+
