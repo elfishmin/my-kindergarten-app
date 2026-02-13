@@ -6,13 +6,10 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定 (強制永久顯示側邊欄)
+# 1. 核心設定 (V26 版本更新：修正轉置邏輯)
 # ==========================================
-# 請確保此 URL 與您的 Google Apps Script 部署網址一致
-SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-
 st.set_page_config(
-    page_title="才藝班點名系統 V24", 
+    page_title="才藝班點名系統 V26", 
     page_icon="🏫", 
     layout="wide", 
     initial_sidebar_state="expanded" 
@@ -170,3 +167,4 @@ with col_dl:
     df_export = pd.DataFrame([{"班級": i[0], "姓名": i[1], "狀態": i[2], "備註": i[3]} for i in status_results.values()])
     csv_data = df_export.to_csv(index=False).encode('utf-8-sig') 
     st.download_button(label="📥 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
+
