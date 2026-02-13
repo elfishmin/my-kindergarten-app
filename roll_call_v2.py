@@ -160,3 +160,4 @@ else:
                         time.sleep(1)
                         st.rerun()
                 except: st.error("連線超時")
+
