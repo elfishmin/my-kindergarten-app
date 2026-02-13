@@ -6,12 +6,30 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定
+# 1. 核心設定 (永遠顯示左側選單)
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
-st.set_page_config(page_title="才藝班點名系統", page_icon="🏫", layout="wide")
 
-# 完整 240+ 筆交叉比對名單 (名單內容不變，僅調整介面)
+st.set_page_config(
+    page_title="才藝班點名系統", 
+    page_icon="🏫", 
+    layout="wide", 
+    initial_sidebar_state="expanded"  # 強制展開選單
+)
+
+# 使用 CSS 隱藏收合按鈕，讓選單永遠固定
+st.markdown("""
+    <style>
+        [data-testid="collapsedControl"] {
+            display: none;
+        }
+        .stRadio [role=radiogroup] {
+            gap: 10px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# 完整 240+ 筆名單 (保持不變)
 all_data = {
     "星期一": {
         "舞蹈A": [("冰淇淋", "吳姷樼"), ("冰淇淋", "宋宥希"), ("冰淇淋", "張簡睿泱"), ("彩虹魚", "周子芹"), ("雪碧", "陳禹妃"), ("雪碧", "劉苡璇"), ("雪碧", "龔畇溱"), ("綠格子", "邱子芮")],
@@ -45,9 +63,9 @@ current_day = weekday_map.get(today_dt.weekday(), "星期一")
 
 if 'done_list' not in st.session_state: st.session_state.done_list = []
 if 'current_class' not in st.session_state:
-    st.session_state.current_class = list(all_data.get(current_day, {"足球":[]}).keys())[0]
+    st.session_state.current_class = list(all_data.get(current_day, {"舞蹈A":[]}).keys())[0]
 
-# --- 3. 側邊欄 ---
+# --- 3. 側邊欄 (永遠顯示) ---
 with st.sidebar:
     st.title("🏫 才藝點名")
     if st.button("🔄 刷新雲端勾勾", use_container_width=True):
@@ -85,32 +103,23 @@ with c_b:
 
 st.divider()
 
-# 點名區：極限縮短名字與選項的距離
+# 點名區 (排版：名字大字體、選項緊貼)
 status_results = {}
 for class_name, name in students:
     full_id = f"{class_name}_{name}"
-    
-    # 比例微調為 [3, 6, 1]，並移除欄位間隙
     col1, col2, col3 = st.columns([3, 6, 1])
-    
     with col1: 
-        # 使用負 margin-right 讓 col1 的內容更靠近 col2
         st.markdown(f"""
             <div style='display: flex; align-items: center; margin-right: -100px;'>
                 <div style='width: 60px; color: gray; font-size: 12px; flex-shrink: 0;'>{class_name}</div>
                 <div style='font-size: 24px; font-weight: bold; margin-left: 5px; color: #1E1E1E; white-space: nowrap;'>{name}</div>
             </div>
         """, unsafe_allow_html=True)
-    
     with col2:
         res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
         status_results[full_id] = (class_name, name, res)
-    
     with col3:
-        if res != "到校":
-            note = st.text_input("原因", key=f"n_{full_id}", label_visibility="collapsed", placeholder="備註")
-        else:
-            note = ""
+        note = st.text_input("原因", key=f"n_{full_id}", label_visibility="collapsed", placeholder="備註") if res != "到校" else ""
         status_results[full_id] += (note,)
 
 # --- 5. 儲存與下載 ---
@@ -119,11 +128,25 @@ col_save, col_dl = st.columns([2, 1])
 
 with col_save:
     if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
-        if active_class not in st.session_state.done_list: st.session_state.done_list.append(active_class)
-        payload = [{"date": today_str, "classroom": active_class, "lesson": item[0], "name": item[1], "status": item[2], "time": datetime.now().strftime("%H:%M:%S"), "note": item[3]} for item in status_results.values()]
-        try: requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=0.1)
-        except: pass
-        st.toast("🎉 雲端儲存成功！")
+        payload = [
+            {
+                "date": today_str, 
+                "classroom": active_class, 
+                "lesson": item[0], 
+                "name": item[1], 
+                "status": item[2], 
+                "time": datetime.now().strftime("%H:%M:%S"), 
+                "note": item[3]
+            } for item in status_results.values()
+        ]
+        try:
+            # 增加至 2 秒以配合 GAS 的覆蓋檢查邏輯
+            requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=2)
+            if active_class not in st.session_state.done_list:
+                st.session_state.done_list.append(active_class)
+            st.toast("🎉 雲端儲存/更新成功！")
+        except:
+            st.toast("傳送中...請稍後確認試算表")
         time.sleep(0.5)
         st.rerun()
 
