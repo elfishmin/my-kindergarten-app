@@ -6,11 +6,11 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定 (V31 最終版)
+# 1. 核心設定 (V32 最終整合版)
 # ==========================================
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 
-st.set_page_config(page_title="才藝班點名系統 V31", page_icon="🏫", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="才藝班點名系統 V32", page_icon="🏫", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -23,8 +23,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- V31 高效快取函數 ---
-@st.cache_data(ttl=3600)  # 快取一小時
+# --- 高效快取函數 ---
+@st.cache_data(ttl=3600)
 def fetch_cloud_data():
     try:
         response = requests.get(f"{SCRIPT_URL}?action=get_students", timeout=10)
@@ -44,7 +44,7 @@ def fetch_cloud_data():
         return structured_data
     except: return {}
 
-# --- 狀態與名單初始化 ---
+# --- 狀態管理 ---
 all_data = fetch_cloud_data()
 today_dt = datetime.now()
 today_str = today_dt.strftime("%Y-%m-%d")
@@ -56,18 +56,18 @@ if 'current_class' not in st.session_state:
     classes_today = list(all_data.get(current_day, {}).keys())
     st.session_state.current_class = classes_today[0] if classes_today else ""
 
-# --- 側邊欄 ---
+# --- 側邊欄 (文字已更新) ---
 with st.sidebar:
-    st.title("🏫 才藝點名系統")
+    st.title("🏫 才藝班點名")
     if st.button("🔄 刷新雲端名單"):
         st.cache_data.clear()
         st.rerun()
-    if st.button("🔄 同步雲端狀態"):
+    if st.button("🔄 刷新點名狀態"):  # 文字已依需求更改
         try:
             r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
             st.session_state.done_list = r.json() if r.status_code == 200 else []
-            st.toast("同步成功！")
-        except: st.toast("連線中...")
+            st.toast("點名狀態已更新！")
+        except: st.toast("連線失敗，請稍後再試。")
     st.divider()
     for day, classes in all_data.items():
         st.markdown(f"### {'🟢' if day == current_day else '⚪'} {day}")
@@ -79,7 +79,7 @@ with st.sidebar:
 # --- 主畫面 ---
 active_class = st.session_state.current_class
 if not active_class:
-    st.info("今天目前沒有安排才藝課程。")
+    st.info("目前選擇的日期沒有安排課程，請點擊側邊欄選擇課程。")
 else:
     students = []
     for d in all_data:
@@ -92,7 +92,7 @@ else:
         if st.button("🙋‍♂️ 全員到校", use_container_width=True):
             for cn, sn in students: st.session_state[f"s_{cn}_{sn}"] = "到校"
     with c_b:
-        if st.button("🧹 重置", use_container_width=True):
+        if st.button("🧹 重置選擇", use_container_width=True):
             for cn, sn in students: st.session_state[f"s_{cn}_{sn}"] = "到校"
     st.divider()
     status_results = {}
@@ -100,21 +100,21 @@ else:
         full_id = f"{class_name}_{name}"
         col1, col2, col3 = st.columns([3, 6, 1])
         with col1: 
-            st.markdown(f"<div style='display: flex; align-items: center;'><div style='width: 60px; color: gray; font-size: 12px;'>{class_name}</div><div style='font-size: 24px; font-weight: bold; color: #1E1E1E;'>{name}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='display: flex; align-items: center;'><div style='width: 60px; color: gray; font-size: 12px;'>{class_name}</div><div style='font-size: 24px; font-weight: bold;'>{name}</div></div>", unsafe_allow_html=True)
         with col2:
             res = st.radio("S", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
             status_results[full_id] = (class_name, name, res)
         with col3:
-            note = st.text_input("N", key=f"n_{full_id}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+            note = st.text_input("N", key=f"n_{full_id}", label_visibility="collapsed", placeholder="備註") if res != "到校" else ""
             status_results[full_id] += (note,)
     st.divider()
     if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
         payload = [{"date": today_str, "classroom": active_class, "lesson": i[0], "name": i[1], "status": i[2], "time": datetime.now().strftime("%H:%M:%S"), "note": i[3]} for i in status_results.values()]
-        with st.spinner('同步報表中...'):
+        with st.spinner('同步雲端資料中...'):
             try:
                 resp = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=15)
                 if resp.status_code == 200:
-                    st.toast("🎉 儲存成功！")
+                    st.success("儲存成功！")
                     if active_class not in st.session_state.done_list: st.session_state.done_list.append(active_class)
                     time.sleep(1); st.rerun()
-            except: st.error("連線超時，請檢查網路。")
+            except: st.error("儲存超時，請檢查網路連線後重試。")
