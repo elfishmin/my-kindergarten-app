@@ -8,7 +8,7 @@ import time
 # ==========================================
 # 1. 核心設定 (V34 安全鎖版)
 # ==========================================
-SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTDHM3oNGMuRuKK_v8wVSM5-PWcGJfKRNMt6Sy4ClNqN280-r1oXZbRhePUD6RZ2LMVg/exec"
 
 st.set_page_config(page_title="才藝班點名系統 V34", page_icon="🏫", layout="wide", initial_sidebar_state="expanded")
 
@@ -160,3 +160,4 @@ else:
                         time.sleep(1)
                         st.rerun()
                 except: st.error("連線超時")
+
