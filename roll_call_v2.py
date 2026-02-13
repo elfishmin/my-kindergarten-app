@@ -9,7 +9,7 @@ import time
 # 1. 核心設定
 # ==========================================
 # 請確保此 URL 是您最新的 GAS 部署網址
-SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEYr6Sz1x2hzhJ25MqJ-P_xWFrr1Spdf7UdfgCM2cBPGgVlNkxnaCr-xMWgStgKkESZQ/exec"
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
 
 st.set_page_config(page_title="才藝班點名 V32", page_icon="🏫", layout="wide", initial_sidebar_state="expanded")
 
@@ -143,4 +143,5 @@ else:
                     time.sleep(1)
                     st.rerun()
             except: st.error("連線超時，請檢查 GAS 部署。")
+
 
