@@ -6,24 +6,25 @@ import json
 import time
 
 # ==========================================
-# 1. 核心設定 (V26 版本更新：修正轉置邏輯)
+# 1. 核心設定 (V27 版本：強制顯示側邊欄與正確 URL)
 # ==========================================
+SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrOI14onlrt4TAEafHX1MfY60rN-dXHJ5RF2Ipx4iB6pp1A8lPPpE8evMNemg5tygtyQ/exec"
+
 st.set_page_config(
-    page_title="才藝班點名系統 V26", 
+    page_title="才藝班點名系統 V27", 
     page_icon="🏫", 
     layout="wide", 
     initial_sidebar_state="expanded" 
 )
 
-# 注入 CSS：強制側邊欄永遠顯示，隱藏收合按鈕，優化 Radio 間距
+# 注入 CSS：強制側邊欄永遠顯示，隱藏收合按鈕
 st.markdown("""
     <style>
-        /* 1. 隱藏左上角的收合/展開箭頭按鈕 */
+        /* 隱藏左上角收合按鈕 */
         [data-testid="collapsedControl"] {
             display: none !important;
         }
-
-        /* 2. 強制側邊欄在手機版也保持顯示 */
+        /* 強制側邊欄在手機窄螢幕下也不收合 */
         @media (max-width: 991px) {
             section[data-testid="stSidebar"] {
                 width: 250px !important;
@@ -34,8 +35,7 @@ st.markdown("""
                 margin-left: 10px !important;
             }
         }
-
-        /* 3. 調整單選框間距 */
+        /* 單選按鈕間距優化 */
         .stRadio [role=radiogroup] {
             gap: 15px;
         }
@@ -43,7 +43,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 名單資料 (維持 240+ 筆交叉比對名單)
+# 2. 名單資料
 # ==========================================
 all_data = {
     "星期一": {
@@ -73,19 +73,17 @@ all_data = {
 # --- 3. 狀態管理 ---
 today_dt = datetime.now()
 today_str = today_dt.strftime("%Y-%m-%d")
-weekday_map = {
-    0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"
-}
+weekday_map = {0: "星期一", 1: "星期二", 2: "星期三", 3: "星期四", 4: "星期五", 5: "星期六", 6: "星期日"}
 current_day = weekday_map.get(today_dt.weekday(), "星期一")
 
 if 'done_list' not in st.session_state: 
     st.session_state.done_list = []
 
 if 'current_class' not in st.session_state:
-    default_classes = list(all_data.get(current_day, {}).keys())
-    st.session_state.current_class = default_classes[0] if default_classes else "舞蹈A"
+    classes_today = list(all_data.get(current_day, {"舞蹈A":[]}).keys())
+    st.session_state.current_class = classes_today[0] if classes_today else "舞蹈A"
 
-# --- 4. 側邊欄 (永遠顯示) ---
+# --- 4. 側邊欄 ---
 with st.sidebar:
     st.title("🏫 才藝點名系統")
     if st.button("🔄 刷新雲端勾勾", use_container_width=True):
@@ -93,7 +91,7 @@ with st.sidebar:
             r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
             st.session_state.done_list = r.json() if r.status_code == 200 else []
             st.toast("同步成功！")
-        except: st.toast("連線中...")
+        except: st.toast("連線雲端中...")
     
     st.divider()
     for day, classes in all_data.items():
@@ -123,12 +121,11 @@ with c_b:
 
 st.divider()
 
-# 點名區
+# 點名區佈局
 status_results = {}
 for class_name, name in students:
     full_id = f"{class_name}_{name}"
     col1, col2, col3 = st.columns([3, 6, 1])
-    
     with col1: 
         st.markdown(f"""
             <div style='display: flex; align-items: center; margin-right: -100px;'>
@@ -136,13 +133,11 @@ for class_name, name in students:
                 <div style='font-size: 24px; font-weight: bold; margin-left: 5px; color: #1E1E1E; white-space: nowrap;'>{name}</div>
             </div>
         """, unsafe_allow_html=True)
-    
     with col2:
         res = st.radio("狀態", ["到校", "請假", "未到"], horizontal=True, key=f"s_{full_id}", label_visibility="collapsed")
         status_results[full_id] = (class_name, name, res)
-    
     with col3:
-        note = st.text_input("原因", key=f"n_{full_id}", label_visibility="collapsed", placeholder="備註") if res != "到校" else ""
+        note = st.text_input("備註", key=f"n_{full_id}", label_visibility="collapsed", placeholder="備註") if res != "到校" else ""
         status_results[full_id] += (note,)
 
 # --- 6. 儲存與下載 ---
@@ -151,20 +146,29 @@ col_save, col_dl = st.columns([2, 1])
 
 with col_save:
     if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
-        payload = [{"date": today_str, "classroom": active_class, "lesson": item[0], "name": item[1], "status": item[2], "time": datetime.now().strftime("%H:%M:%S"), "note": item[3]} for item in status_results.values()]
+        payload = [
+            {
+                "date": today_str, 
+                "classroom": active_class, 
+                "lesson": item[0], 
+                "name": item[1], 
+                "status": item[2], 
+                "time": datetime.now().strftime("%H:%M:%S"), 
+                "note": item[3]
+            } for item in status_results.values()
+        ]
         try:
+            # 發送後端寫入與同步請求
             requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=2)
             if active_class not in st.session_state.done_list:
                 st.session_state.done_list.append(active_class)
-            st.toast("🎉 雲端儲存/更新成功！")
+            st.toast("🎉 雲端儲存與報表更新成功！")
         except:
-            st.toast("連線中，請確認雲端試算表...")
-        
+            st.toast("連線中，請稍後確認試算表")
         time.sleep(0.5)
         st.rerun()
 
 with col_dl:
     df_export = pd.DataFrame([{"班級": i[0], "姓名": i[1], "狀態": i[2], "備註": i[3]} for i in status_results.values()])
     csv_data = df_export.to_csv(index=False).encode('utf-8-sig') 
-    st.download_button(label="📥 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
-
+    st.download_button(label="📥 下載 CSV", data=csv_data, file_name=f"{active_class}_{today_str}.csv", mime="text/csv", use_container_width=True)
