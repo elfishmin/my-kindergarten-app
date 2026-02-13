@@ -118,3 +118,4 @@ else:
                     if active_class not in st.session_state.done_list: st.session_state.done_list.append(active_class)
                     time.sleep(1); st.rerun()
             except: st.error("儲存超時，請檢查網路連線後重試。")
+
