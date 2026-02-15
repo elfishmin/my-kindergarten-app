@@ -62,7 +62,7 @@ with st.sidebar:
             st.toast("狀態已更新")
         except: st.toast("連線失敗")
 
-    if st.button("♻️ 刷新名單與課程", use_container_width=True):
+    if st.button("♻️ 刷新名單", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
     
@@ -117,4 +117,5 @@ if st.session_state.current_class:
             except: st.error("儲存失敗")
 else:
     st.info("請選擇左側課程")
+
 
