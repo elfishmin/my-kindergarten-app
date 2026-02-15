@@ -164,3 +164,4 @@ if active_class:
                 except: st.error("連線超時")
 else:
     st.info("💡 請從左側選單選擇課程。")
+
