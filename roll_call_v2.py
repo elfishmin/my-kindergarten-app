@@ -40,7 +40,7 @@ def fetch_cloud_data():
         for row in raw_schedule:
             if len(row) < 2: continue
             day = str(row[0]).replace(" ", "").strip()
-            course = str(row[1]).replace(" ", "").strip() # "舞蹈 A" -> "舞蹈A"
+            course = str(row[1]).replace(" ", "").strip()
             if course not in course_to_days:
                 course_to_days[course] = []
             course_to_days[course].append(day)
@@ -50,9 +50,8 @@ def fetch_cloud_data():
             if len(row) < 3: continue
             class_name = str(row[0]).strip()
             student_name = str(row[1]).strip()
-            subject = str(row[2]).replace(" ", "").strip() # "舞蹈"
+            subject = str(row[2]).replace(" ", "").strip()
             
-            # 嚴格比對：subject 必須與 course_to_days 的 Key 完全一致
             if subject in course_to_days:
                 for day in course_to_days[subject]:
                     if day in structured_data:
@@ -87,13 +86,12 @@ with st.sidebar:
         try:
             r = requests.get(f"{SCRIPT_URL}?date={today_str}", timeout=5)
             st.session_state.done_list = r.json() if r.status_code == 200 else []
-            st.toast("狀態已更新！")
+            st.toast("點名狀態已更新！")
         except: st.toast("連線失敗")
         
     st.divider()
     for day, classes in all_data.items():
         if not classes: continue
-        # 亮燈邏輯：只有當系統時間真的等於該星期時才亮🟢
         is_real_today = (day == current_day)
         st.subheader(f"{'🟢' if is_real_today else '⚪'} {day}")
         for c in classes.keys():
@@ -101,25 +99,68 @@ with st.sidebar:
             if st.button(f"{icon} {c}", key=f"btn_{day}_{c}", use_container_width=True):
                 st.session_state.current_class = c
                 st.session_state.current_day_sel = day
-                st.session_state.unlock_non_today = is_real_today
+                st.session_state.unlock_non_today = (day == current_day)
 
-# --- 主畫面 ---
+# --- 主畫面邏輯：解鎖後顯示點名表 ---
 active_class = st.session_state.current_class
 selected_day = st.session_state.current_day_sel
 
 if active_class:
-    # 警告鎖功能
-    if (selected_day != current_day) and not st.session_state.unlock_non_today:
-        st.markdown(f'<div class="warning-box"><h2>⚠️ 非當天點名警告</h2><p>這是 {selected_day} 的課，今天是 {current_day}。</p></div>', unsafe_allow_html=True)
+    is_today = (selected_day == current_day)
+    
+    # 顯示警告鎖：如果不是今天且尚未點擊解鎖
+    if not is_today and not st.session_state.unlock_non_today:
+        st.markdown(f"""
+            <div class="warning-box">
+                <h2>⚠️ 非當天點名警告</h2>
+                <p>您選擇的是 <b>{selected_day}</b> 的課程，但今天是 <b>{current_day}</b>。</p>
+            </div>
+        """, unsafe_allow_html=True)
         if st.button(f"🔓 確認補登 {selected_day} 紀錄", use_container_width=True):
             st.session_state.unlock_non_today = True
             st.rerun()
     else:
+        # --- 點名介面開始 (解鎖後或當天課程都會進到這裡) ---
         st.title(f"🍎 {active_class} ({selected_day})")
         students = all_data.get(selected_day, {}).get(active_class, [])
         
-        # 點名介面... (略，與 V34 同)
+        # 快捷鍵
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🙋‍♂️ 全員到校", use_container_width=True):
+                for i, (cn, sn) in enumerate(students):
+                    st.session_state[f"r_{active_class}_{sn}_{i}"] = "到校"
+        with c2:
+            if st.button("🧹 重置選擇", use_container_width=True):
+                for i, (cn, sn) in enumerate(students):
+                    st.session_state[f"r_{active_class}_{sn}_{i}"] = "到校"
+
+        st.divider()
+        
+        status_results = {}
         for i, (cn, sn) in enumerate(students):
-            st.write(f"{cn} - {sn}")
+            key = f"r_{active_class}_{sn}_{i}"
+            col1, col2, col3 = st.columns([2, 5, 2])
+            with col1: st.markdown(f"**{cn}**\n### {sn}")
+            with col2:
+                # 這裡就是您說不見的選項！現在移到 else 區塊確保一定顯示
+                res = st.radio("S", ["到校", "請假", "未到"], key=key, horizontal=True, label_visibility="collapsed")
+            with col3:
+                note = st.text_input("備註", key=f"n_{key}", label_visibility="collapsed", placeholder="原因") if res != "到校" else ""
+            status_results[i] = {"class": cn, "name": sn, "status": res, "note": note}
+
+        st.divider()
+        if st.button("🚀 儲存紀錄至雲端", type="primary", use_container_width=True):
+            payload = [{"date": today_str, "classroom": active_class, "lesson": v["class"], "name": v["name"], "status": v["status"], "time": datetime.now().strftime("%H:%M:%S"), "note": v["note"]} for v in status_results.values()]
+            with st.spinner('同步中...'):
+                try:
+                    resp = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=15)
+                    if resp.status_code == 200:
+                        st.success("儲存成功！")
+                        if active_class not in st.session_state.done_list:
+                            st.session_state.done_list.append(active_class)
+                        time.sleep(1)
+                        st.rerun()
+                except: st.error("連線超時")
 else:
-    st.info("請從左側選擇課程")
+    st.info("💡 請從左側選單選擇課程。")
