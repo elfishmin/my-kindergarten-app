@@ -5,7 +5,7 @@ import requests
 import json
 import time
 
-st.set_page_config(page_title="才藝班點名系統 V34.3", page_icon="🏫", layout="wide")
+st.set_page_config(page_title="才藝班點名系統 V34.4", page_icon="🏫", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTDHM3oNGMuRuKK_v8wVSM5-PWcGJfKRNMt6Sy4ClNqN280-r1oXZbRhePUD6RZ2LMVg/exec"
 
@@ -128,6 +128,7 @@ if st.session_state.current_class:
             except: st.error("儲存失敗")
 else:
     st.info("請選擇左側課程")
+
 
 
 
