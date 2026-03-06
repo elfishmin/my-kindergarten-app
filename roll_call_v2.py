@@ -51,7 +51,7 @@ if 'unlock_confirm' not in st.session_state: st.session_state.unlock_confirm = F
 
 # --- 側邊欄 ---
 with st.sidebar:
-    st.title("🏫 點名系統 V34.3")
+    st.title("🏫 點名系統 V34.4")
     st.write(f"今天是：{current_day}")
     
     # 新增：刷新狀態按鈕
@@ -128,6 +128,7 @@ if st.session_state.current_class:
             except: st.error("儲存失敗")
 else:
     st.info("請選擇左側課程")
+
 
 
 
