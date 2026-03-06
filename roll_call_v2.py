@@ -119,15 +119,29 @@ if st.session_state.current_class:
 
         if st.button("🚀 儲存至雲端", type="primary", use_container_width=True):
             payload = [{"date": today_str, "classroom": v["class_name"], "lesson": active_class, "name": v["name"], "status": v["status"], "time": datetime.now().strftime("%H:%M:%S"), "note": v["note"]} for v in results.values()]
-            try:
-                resp = requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=60)
-                if resp.status_code == 200:
-                    st.success("儲存完成！")
-                    if active_class not in st.session_state.done_list: st.session_state.done_list.append(active_class)
-                    time.sleep(1); st.rerun()
-            except: st.error("儲存失敗")
+            
+            with st.spinner('同步中...'):
+                try:
+                    # 1. 直接發送請求，不檢查回應內容
+                    requests.post(SCRIPT_URL, data=json.dumps(payload), timeout=60)
+                    
+                    # 2. 只要執行到這，就當作成功 (因為你說試算表其實都有更新)
+                    st.success("✅ 點名紀錄已送出")
+                    
+                    # 3. 更新側邊欄的 ✅ 狀態
+                    if active_class not in st.session_state.done_list:
+                        st.session_state.done_list.append(active_class)
+                    
+                    time.sleep(1)
+                    st.rerun()
+                except:
+                    # 即使超時或報錯，也提示使用者檢查試算表，不再跳紅色警告
+                    st.warning("⚠️ 已嘗試送出，請至試算表確認資料。")
+                    time.sleep(1)
+                    st.rerun()
 else:
     st.info("請選擇左側課程")
+
 
 
 
