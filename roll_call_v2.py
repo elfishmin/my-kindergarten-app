@@ -96,7 +96,7 @@ if st.session_state.current_class:
         if st.button("🙋‍♂️ 全員到校", use_container_width=True):
             for i, (cn, sn) in enumerate(students): st.session_state[f"r_{active_class}_{sn}"] = "到校"
         
-st.divider()
+        st.divider()
         results = {}
         for i, (cn, sn) in enumerate(students):
             key = f"r_{active_class}_{sn}"
@@ -128,6 +128,7 @@ st.divider()
             except: st.error("儲存失敗")
 else:
     st.info("請選擇左側課程")
+
 
 
 
