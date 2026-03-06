@@ -96,15 +96,26 @@ if st.session_state.current_class:
         if st.button("🙋‍♂️ 全員到校", use_container_width=True):
             for i, (cn, sn) in enumerate(students): st.session_state[f"r_{active_class}_{sn}"] = "到校"
         
-        st.divider()
+st.divider()
         results = {}
         for i, (cn, sn) in enumerate(students):
             key = f"r_{active_class}_{sn}"
-            c1, c2, c3 = st.columns([2, 5, 2])
-            with c1: st.write(f"**{cn}**\n### {sn}")
-            with c2: res = st.radio("S", ["到校", "請假", "未到"], key=key, horizontal=True, label_visibility="collapsed")
-            with c3: note = st.text_input("備註", key=f"n_{key}", label_visibility="collapsed") if res != "到校" else ""
+            
+            # 關鍵修改：將欄位拆分為 [1.5, 2, 5.5, 1]，確保班級、姓名、狀態平行
+            c1, c2, c3, c4 = st.columns([1.5, 2, 5.5, 1], gap="small")
+            
+            with c1: 
+                st.write(f"**{cn}**")  # 班別
+            with c2: 
+                st.write(f"**{sn}**")  # 姓名 (移除 ### 避免換行)
+            with c3: 
+                res = st.radio("S", ["到校", "請假", "未到"], key=key, horizontal=True, label_visibility="collapsed")
+            with c4: 
+                # 只有非到校才顯示備註小框，保持整齊
+                note = st.text_input("📝", key=f"n_{key}", label_visibility="collapsed", placeholder="理由") if res != "到校" else ""
+            
             results[i] = {"class_name": cn, "name": sn, "status": res, "note": note}
+            st.markdown("---") # 每一位學生間的橫線
 
         if st.button("🚀 儲存至雲端", type="primary", use_container_width=True):
             payload = [{"date": today_str, "classroom": v["class_name"], "lesson": active_class, "name": v["name"], "status": v["status"], "time": datetime.now().strftime("%H:%M:%S"), "note": v["note"]} for v in results.values()]
@@ -117,6 +128,7 @@ if st.session_state.current_class:
             except: st.error("儲存失敗")
 else:
     st.info("請選擇左側課程")
+
 
 
 
