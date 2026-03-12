@@ -6,7 +6,7 @@ import json
 import time
 
 # --- 設定頁面 ---
-st.set_page_config(page_title="才藝班點名系統 V34.5", page_icon="🏫", layout="wide")
+st.set_page_config(page_title="才藝班點名系統 V34.6", page_icon="🏫", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTDHM3oNGMuRuKK_v8wVSM5-PWcGJfKRNMt6Sy4ClNqN280-r1oXZbRhePUD6RZ2LMVg/exec"
 CORRECT_PASSWORD = "076452005"  # <--- 請在這裡設定你的正式密碼
@@ -71,7 +71,7 @@ if 'unlock_confirm' not in st.session_state: st.session_state.unlock_confirm = F
 
 # --- 側邊欄 ---
 with st.sidebar:
-    st.title("🏫 點名系統 V34.5")
+    st.title("🏫 點名系統 V34.6")
     st.write(f"今天是：{current_day}")
     
     # 新增：刷新狀態按鈕
@@ -161,6 +161,7 @@ if st.session_state.current_class:
                     st.rerun()
 else:
     st.info("請選擇左側課程")
+
 
 
 
