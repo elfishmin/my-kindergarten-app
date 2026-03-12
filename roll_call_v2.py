@@ -5,11 +5,31 @@ import requests
 import json
 import time
 
+# --- 設定頁面 ---
 st.set_page_config(page_title="才藝班點名系統 V34.5", page_icon="🏫", layout="wide")
 
 SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxTDHM3oNGMuRuKK_v8wVSM5-PWcGJfKRNMt6Sy4ClNqN280-r1oXZbRhePUD6RZ2LMVg/exec"
+CORRECT_PASSWORD = "076452005"  # <--- 請在這裡設定你的正式密碼
 
-# --- 核心資料：還原 V34 讀取邏輯，確保名單出現 ---
+# --- 1. 登入邏輯：利用 session_state 記住解鎖狀態 ---
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+def check_login():
+    if st.session_state.password_input == CORRECT_PASSWORD:
+        st.session_state.authenticated = True
+        st.toast("解鎖成功！")
+    else:
+        st.error("密碼錯誤，請再試一次")
+
+# --- 登入介面 ---
+if not st.session_state.authenticated:
+    st.title("🔐 系統安全鎖")
+    st.text_input("請輸入管理密碼以開始使用", type="password", key="password_input", on_change=check_login)
+    st.info("提示：輸入密碼後按 Enter 鍵解鎖。只要瀏覽器分頁不關閉，就不用重新輸入。")
+    st.stop() # 沒解鎖前，後面的 Code 通通不跑
+
+# --- 2. 核心資料讀取 (解鎖後才執行) ---
 @st.cache_data(ttl=60)
 def fetch_cloud_data():
     try:
@@ -141,6 +161,7 @@ if st.session_state.current_class:
                     st.rerun()
 else:
     st.info("請選擇左側課程")
+
 
 
 
